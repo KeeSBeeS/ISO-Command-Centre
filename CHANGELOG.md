@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.7.1
+
+Customer site contact people and delete-control update.
+
+- Added contact people under Customer Site / Location.
+- Added contact types: Accounts, Stores, Foreman, Engineer and Other.
+- Contact details include name, position/title, phone, mobile/WhatsApp, email, status and notes.
+- Added ability to delete contact people under a site/location.
+- Added visible delete controls for client sites/locations.
+- Added visible delete controls for customers.
+- Added permissions `site_contacts.view` and `site_contacts.manage`.
+- System Administrator permissions are re-synced.
+
 ## v2.7.0
 
 Customer sites, site equipment, site medical compliance and Update Manager.
