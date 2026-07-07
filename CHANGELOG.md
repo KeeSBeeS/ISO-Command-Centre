@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.7.0
+
+Customer sites, site equipment, site medical compliance and Update Manager.
+
+- Customers now have Sites / Locations.
+- Each location can track installed equipment as rented or permanent.
+- Each location can define site-specific medical requirements.
+- Employees can be assigned to customer locations.
+- Site access compliance is evaluated against active employee profile documents and document expiry dates.
+- Update Manager added under System Settings for GitHub source settings and ZIP upload/apply workflow.
+- System Administrator permissions are re-synced to all permissions.
+- New permissions: customer_sites.view, customer_sites.manage, site_equipment.manage, site_medicals.view, site_medicals.manage, site_access.view, site_access.manage, update_manager.view, update_manager.manage.
+
 ## v2.6.14
 
 Employees page sorting update.
