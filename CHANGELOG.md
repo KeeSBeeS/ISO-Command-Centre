@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.6.14
+
+Employees page sorting update.
+
+- Added clickable sort headings to the Employees page.
+- Employee heading sorts by employee name.
+- Department heading sorts by first assigned department name.
+- Role heading sorts by first assigned role name.
+- Sort direction toggles between ascending and descending.
+- Search, status filters and pagination preserve the selected sort order.
+
 ## v2.6.13
 
 Time Attendance, employee document profile restore and PC-first layout update.
