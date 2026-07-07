@@ -1,0 +1,212 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\AttendanceDay;
+use App\Models\AttendanceImport;
+use App\Models\AttendanceRawRecord;
+use App\Services\AttendanceCsvImporter;
+use App\Services\AttendanceMailboxImporter;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Schema;
+
+class AttendanceController extends Controller
+{
+    public function index(Request $request)
+    {
+        if (!$this->attendanceInstalled()) {
+            return redirect()->route('updates.v1_1')->withErrors(['attendance' => 'Apply Version 1.1 before using attendance.']);
+        }
+
+        $latestAttendanceDate = AttendanceDay::query()->max('attendance_date');
+        $hasExplicitFilter = $request->filled('date_from')
+            || $request->filled('date_to')
+            || $request->filled('search')
+            || $request->boolean('late_only')
+            || $request->boolean('public_holidays_only');
+
+        $dateFrom = $request->input('date_from', $hasExplicitFilter ? now()->toDateString() : ($latestAttendanceDate ?: now()->toDateString()));
+        $dateTo = $request->input('date_to', $dateFrom);
+
+        $days = AttendanceDay::query()
+            ->with(['user.roles', 'user.departments'])
+            ->whereBetween('attendance_date', [$dateFrom, $dateTo])
+            ->when($request->boolean('late_only') && Schema::hasColumn('attendance_days', 'is_late'), function ($query) {
+                $query->where('is_late', true);
+            })
+            ->when($request->boolean('public_holidays_only') && Schema::hasColumn('attendance_days', 'is_public_holiday'), function ($query) {
+                $query->where('is_public_holiday', true);
+            })
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = $request->string('search');
+                $query->whereHas('user', function ($userQuery) use ($search) {
+                    $userQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('attendance_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
+            ->orderByDesc('attendance_date')
+            ->orderBy('start_time')
+            ->paginate(30)
+            ->withQueryString();
+
+        $summaryQuery = AttendanceDay::query()->whereBetween('attendance_date', [$dateFrom, $dateTo]);
+        $lateQuery = (clone $summaryQuery);
+        $holidayQuery = (clone $summaryQuery);
+
+        $workingDayScope = function ($query) {
+            if (Schema::hasColumn('attendance_days', 'is_public_holiday')) {
+                $query->where(function ($nested) {
+                    $nested->where('is_public_holiday', false)->orWhereNull('is_public_holiday');
+                });
+            }
+        };
+
+        return view('attendance.index', [
+            'days' => $days,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'latestAttendanceDate' => $latestAttendanceDate,
+            'presentCount' => (clone $summaryQuery)->whereNotNull('start_time')->where($workingDayScope)->distinct('user_id')->count('user_id'),
+            'absentCount' => (clone $summaryQuery)->whereNull('start_time')->where($workingDayScope)->count(),
+            'recordCount' => (clone $summaryQuery)->sum('record_count'),
+            'singleRecordCount' => (clone $summaryQuery)->where('record_count', '<=', 1)->count(),
+            'lateClockInCount' => Schema::hasColumn('attendance_days', 'is_late') ? $lateQuery->where('is_late', true)->count() : 0,
+            'publicHolidayAttendanceCount' => Schema::hasColumn('attendance_days', 'is_public_holiday') ? $holidayQuery->where('is_public_holiday', true)->count() : 0,
+            'latestImport' => AttendanceImport::latest()->first(),
+        ]);
+    }
+
+    public function show(AttendanceDay $attendanceDay)
+    {
+        if (!$this->attendanceInstalled()) {
+            return redirect()->route('updates.v1_1');
+        }
+
+        $records = AttendanceRawRecord::query()
+            ->where('user_id', $attendanceDay->user_id)
+            ->whereDate('attendance_date', $attendanceDay->attendance_date)
+            ->orderBy('recorded_at')
+            ->get();
+
+        $attendanceDay->load('user', 'import');
+
+        return view('attendance.show', compact('attendanceDay', 'records'));
+    }
+
+    public function upload()
+    {
+        if (!$this->attendanceInstalled()) {
+            return redirect()->route('updates.v1_1');
+        }
+
+        return view('attendance.upload');
+    }
+
+    public function importUpload(Request $request, AttendanceCsvImporter $importer)
+    {
+        if (!$this->attendanceInstalled()) {
+            return redirect()->route('updates.v1_1');
+        }
+
+        $data = $request->validate([
+            'csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+        ]);
+
+        $file = $data['csv_file'];
+        $import = $importer->importString(file_get_contents($file->getRealPath()), [
+            'source' => 'upload',
+            'filename' => $file->getClientOriginalName(),
+            'imported_by' => $request->user()->id,
+            'received_at' => now(),
+        ]);
+
+        return redirect()->route('attendance.imports')->with('success', $this->summaryMessage($import));
+    }
+
+
+    public function manualUpload()
+    {
+        if (!$this->attendanceInstalled()) {
+            return redirect()->route('updates.v1_1');
+        }
+
+        return view('attendance.manual_upload');
+    }
+
+    public function importManualUpload(Request $request, AttendanceCsvImporter $importer)
+    {
+        if (!$this->attendanceInstalled()) {
+            return redirect()->route('updates.v1_1');
+        }
+
+        $data = $request->validate([
+            'csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+            'import_note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $file = $data['csv_file'];
+        $import = $importer->importString(file_get_contents($file->getRealPath()), [
+            'source' => 'director_manual_upload',
+            'filename' => $file->getClientOriginalName(),
+            'imported_by' => $request->user()->id,
+            'received_at' => now(),
+            'received_subject' => $data['import_note'] ?? 'Director manual CSV upload',
+        ]);
+
+        return redirect()->route('attendance.imports')->with('success', 'Director manual CSV upload completed. ' . $this->summaryMessage($import));
+    }
+
+    public function fetchEmail(AttendanceMailboxImporter $mailboxImporter)
+    {
+        if (!$this->attendanceInstalled()) {
+            return redirect()->route('updates.v1_1');
+        }
+
+        $result = $mailboxImporter->importUnread();
+
+        if (!$result['ok']) {
+            return back()->withErrors(['email_import' => $result['message']]);
+        }
+
+        return redirect()->route('attendance.imports')->with('success', $result['message']);
+    }
+
+    public function fetchEmailByKey(string $key, AttendanceMailboxImporter $mailboxImporter)
+    {
+        if (!$this->attendanceInstalled()) {
+            abort(503, 'Attendance tables are not installed.');
+        }
+
+        $expected = env('ATTENDANCE_IMPORT_KEY');
+        if (!$expected || !hash_equals((string) $expected, $key)) {
+            abort(403, 'Invalid attendance import key.');
+        }
+
+        $result = $mailboxImporter->importUnread();
+
+        return Response::json($result);
+    }
+
+    public function imports()
+    {
+        if (!$this->attendanceInstalled()) {
+            return redirect()->route('updates.v1_1');
+        }
+
+        return view('attendance.imports', [
+            'imports' => AttendanceImport::with('importer')->latest()->paginate(25),
+        ]);
+    }
+
+    private function attendanceInstalled(): bool
+    {
+        return Schema::hasTable('attendance_days') && Schema::hasTable('attendance_imports') && Schema::hasTable('attendance_raw_records');
+    }
+
+    private function summaryMessage(AttendanceImport $import): string
+    {
+        return 'Attendance import completed: ' . $import->matched_rows . ' matched row(s), ' . $import->skipped_rows . ' skipped row(s), ' . $import->day_rows . ' daily record(s) rebuilt.';
+    }
+}

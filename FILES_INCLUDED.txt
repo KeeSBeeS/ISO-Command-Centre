@@ -1,0 +1,18 @@
+ISO Admin Command Framework v2.6.9 package
+
+Changed / added files:
+
+app/Http/Controllers/DashboardController.php
+app/Http/Controllers/UpdateController.php
+app/Http/Controllers/VehicleController.php
+app/Models/QuickActionPreference.php
+app/Models/Vehicle.php
+resources/views/dashboard.blade.php
+resources/views/dashboard_edit.blade.php
+resources/views/dashboard_quick_actions.blade.php
+resources/views/layouts/app.blade.php
+resources/views/updates/v2_6_9.blade.php
+resources/views/vehicles/fuel_select.blade.php
+resources/views/vehicles/index.blade.php
+routes/web.php
+README_V2_6_9_VEHICLE_DASHBOARD_QUICK_ACTIONS.md
