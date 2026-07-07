@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.6.13
+
+Time Attendance, employee document profile restore and PC-first layout update.
+
+- Attendance office hours now default to 06:00 to 15:00.
+- Valid check-in window now defaults to 05:00 to 10:00.
+- Valid checkout window now defaults to 10:00 to 16:00.
+- Attendance calculations now use the earliest valid check-in and latest valid checkout.
+- Late minutes are calculated from 06:00 and early-leave minutes from 15:00.
+- Attendance employee summary headings are sortable.
+- Employee profile documents are shown again with document counts and expiry attention.
+- Layout shell widened for PC-first use while retaining mobile responsiveness.
+- Changelog format extended for easier rollback/reference.
+
 ## v2.6.12
 
 Time Attendance exception reporting update.
