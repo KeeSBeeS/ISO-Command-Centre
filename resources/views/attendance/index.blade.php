@@ -19,10 +19,13 @@
             <div>
                 <h2 style="margin:0">{{ $selectedEmployee->name }} Attendance Entries</h2>
                 <p class="muted small" style="margin:6px 0 0">
-                    Showing all entries for this employee in the selected period. Company time rules: start {{ $attendanceStartTime }}, close {{ $attendanceCloseTime }}.
+                    Showing all daily summaries for this employee in the selected period. Office time rules: start {{ $attendanceStartTime }}, close {{ $attendanceCloseTime }}.
                 </p>
             </div>
-            <a class="btn" href="{{ route('attendance.index') }}">Clear Employee Filter</a>
+            <div class="actions right">
+                <a class="btn primary" href="{{ route('attendance.show', $selectedEmployee->employee_code ?: $selectedEmployee->id) }}">View Imported Records</a>
+                <a class="btn" href="{{ route('attendance.index') }}">Clear Employee Filter</a>
+            </div>
         </div>
         <div class="grid cols-4" style="margin-top:14px">
             <div class="card metric"><span>Attendance Days</span><strong>{{ $employeeAttendanceSummary['days'] }}</strong></div>
@@ -62,17 +65,18 @@
 
 <div class="card">
     <h2>Daily Attendance Summary</h2>
-    <p class="muted small">Company start time is {{ $attendanceStartTime }} and company close time is {{ $attendanceCloseTime }}. Click an employee name to open all attendance entries for that employee and see total late and early-leave time. All matched raw CSV punch records are retained for drill-down and audit.</p>
+    <p class="muted small">Office start time is {{ $attendanceStartTime }} and office close time is {{ $attendanceCloseTime }}. Click an employee name or View to open <code>/attendance/{employee code}</code> and see every imported raw record for that employee.</p>
     <div class="table-wrap">
         <table>
             <thead><tr><th>Date</th><th>Employee</th><th>Start</th><th>Checkout</th><th>Hours</th><th>Records</th><th>Status</th><th></th></tr></thead>
             <tbody>
             @forelse($days as $day)
+                @php($employeeRouteCode = $day->user->employee_code ?: $day->user_id)
                 <tr>
                     <td>{{ optional($day->attendance_date)->format('Y-m-d') }}</td>
                     <td>
-                        <a href="{{ route('attendance.index', ['employee_id' => $day->user_id]) }}"><strong>{{ $day->user->name }}</strong></a><br>
-                        <span class="muted small">{{ $day->source_names }}</span>
+                        <a href="{{ route('attendance.show', $employeeRouteCode) }}"><strong>{{ $day->user->name }}</strong></a><br>
+                        <span class="muted small">{{ $day->user->employee_code ? 'Code: '.$day->user->employee_code : 'User ID: '.$day->user_id }}</span>
                     </td>
                     <td>{{ optional($day->start_time)->format('H:i:s') ?? '-' }}<br><span class="muted small">{{ $day->first_status }}</span></td>
                     <td>{{ optional($day->end_time)->format('H:i:s') ?? '-' }}<br><span class="muted small">{{ $day->last_status }}</span></td>
@@ -89,7 +93,7 @@
                             <span class="pill">OK</span>
                         @endif
                     </td>
-                    <td class="actions right"><a class="btn" href="{{ route('attendance.show',$day) }}">View</a></td>
+                    <td class="actions right"><a class="btn" href="{{ route('attendance.show', $employeeRouteCode) }}">View Records</a></td>
                 </tr>
             @empty
                 <tr><td colspan="8" class="muted">No attendance records found for this filter.</td></tr>
