@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.8.0
+
+Employee Compliance Management Phase 1, Phase 2 and Phase 3.
+
+- Added database-driven employee document types.
+- Added required document rules/matrix by all employees, departments, roles and basic job-title matching.
+- Extended employee documents with document type linkage, issue date, approval status, approval/rejection audit fields, sensitivity, medical flags and replaced-document link.
+- Added document approval workflow with pending, approve and reject states.
+- Added employee compliance overview with missing, expired, expiring soon, awaiting approval and compliance percentage.
+- Added company policy module with versions, assignments and acknowledgement tracking.
+- Added policy acknowledgement reporting for acknowledged and missing employees.
+- Added medical compliance records with fit/restricted/unfit/pending status and sensitive access rules.
+- Added licence compliance records for Driver’s Licence, PDP, Forklift Licence, Equipment Operator Certificate, Site Access Certificate and other permits.
+- Added dashboard compliance widget and employee profile compliance sections.
+- Added sensitive document download permission checks.
+- Added permissions for document types, employee compliance, document approval, policies, medical compliance and licence compliance.
+
 ## v2.7.1
 
 Customer site contact people and delete-control update.
