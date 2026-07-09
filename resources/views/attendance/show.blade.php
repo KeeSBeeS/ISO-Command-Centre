@@ -28,6 +28,10 @@
 
 <div style="height:16px"></div>
 
+<div class="alert warning">
+    This page now displays the full CSV record detail where available: Person ID, Department, Attendance Check Point, Custom Name, Data Source, Handling Type, Temperature and Abnormal. For older imports, re-import the same CSV after this update to backfill the extra fields onto existing raw records.
+</div>
+
 <div class="card">
     <form method="get" class="form-grid">
         <div class="form-row">
@@ -49,7 +53,7 @@
         </div>
         <div class="form-row">
             <label>Search Imported Records</label>
-            <input type="text" name="search" value="{{ request('search') }}" placeholder="CSV name or status">
+            <input type="text" name="search" value="{{ request('search') }}" placeholder="CSV name, status or checkpoint">
         </div>
         <div class="form-row" style="align-self:end">
             <button class="btn primary full" type="submit">Filter Records</button>
@@ -165,16 +169,39 @@
 <div class="card">
     <h2>All Imported Raw Records</h2>
     <p class="muted small">Every raw CSV punch record currently linked to this employee is shown here. Records are sorted from newest to oldest.</p>
-    <div class="table-wrap">
+    <div class="table-wrap wide-record-table">
         <table>
-            <thead><tr><th>Recorded Time</th><th>Date</th><th>Name in CSV</th><th>Status</th><th>Import Source</th><th>Imported At</th></tr></thead>
+            <thead>
+                <tr>
+                    <th>Recorded Time</th>
+                    <th>Person ID</th>
+                    <th>Name in CSV</th>
+                    <th>Department</th>
+                    <th>Status</th>
+                    <th>Attendance Check Point</th>
+                    <th>Custom Name</th>
+                    <th>Data Source</th>
+                    <th>Handling Type</th>
+                    <th>Temperature</th>
+                    <th>Abnormal</th>
+                    <th>Import Source</th>
+                    <th>Imported At</th>
+                </tr>
+            </thead>
             <tbody>
             @forelse($rawRecords as $record)
                 <tr>
                     <td>{{ optional($record->recorded_at)->format('Y-m-d H:i:s') ?? '-' }}</td>
-                    <td>{{ optional($record->attendance_date)->format('Y-m-d') ?? '-' }}</td>
+                    <td>{{ $record->person_id ?? '-' }}</td>
                     <td>{{ $record->employee_name }}</td>
+                    <td>{{ $record->department ?? '-' }}</td>
                     <td><span class="pill">{{ $record->attendance_status ?: 'Blank' }}</span></td>
+                    <td>{{ $record->attendance_check_point ?? '-' }}</td>
+                    <td>{{ $record->custom_name ?? '-' }}</td>
+                    <td>{{ $record->data_source ?? '-' }}</td>
+                    <td>{{ $record->handling_type ?? '-' }}</td>
+                    <td>{{ $record->temperature ?? '-' }}</td>
+                    <td>{{ $record->abnormal ?? '-' }}</td>
                     <td>
                         {{ optional($record->import)->filename ?? 'Unknown file' }}<br>
                         <span class="muted small">{{ ucfirst(str_replace('_',' ', optional($record->import)->source ?? 'unknown')) }}</span>
@@ -182,7 +209,7 @@
                     <td>{{ optional($record->created_at)->format('Y-m-d H:i') }}</td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="muted">No raw imported records found for this employee and filter.</td></tr>
+                <tr><td colspan="13" class="muted">No raw imported records found for this employee and filter.</td></tr>
             @endforelse
             </tbody>
         </table>
@@ -194,5 +221,7 @@
     .employee-attendance-hero{background:linear-gradient(135deg,rgba(15,23,42,.04),rgba(59,130,246,.06))}
     .status-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid rgba(148,163,184,.18)}
     .status-row:last-child{border-bottom:none}
+    .wide-record-table{overflow-x:auto}
+    .wide-record-table table{min-width:1450px}
 </style>
 @endsection
