@@ -14,6 +14,8 @@ class CoreSettingController extends Controller
         $this->authorizeSystemAdministrator($request);
         abort_unless(Schema::hasTable('system_settings'), 404, 'Run the v2.5.3 update first.');
 
+        $this->ensureAttendanceSettings();
+
         return view('settings.core.index', [
             'groups' => SystemSetting::whereNotIn('group', ['Vehicle Tracking API', 'Google API'])->orderBy('group')->orderBy('sort_order')->orderBy('label')->get()->groupBy('group'),
         ]);
@@ -23,6 +25,8 @@ class CoreSettingController extends Controller
     {
         $this->authorizeSystemAdministrator($request);
         abort_unless(Schema::hasTable('system_settings'), 404, 'Run the v2.5.3 update first.');
+
+        $this->ensureAttendanceSettings();
 
         $settings = SystemSetting::whereNotIn('group', ['Vehicle Tracking API', 'Google API'])->orderBy('group')->orderBy('sort_order')->get();
         $submitted = $request->input('settings', []);
@@ -39,6 +43,12 @@ class CoreSettingController extends Controller
                     $errors[$key] = $setting->label . ' must be a number.';
                 }
                 $value = ($value === null || $value === '') ? null : (string) (int) $value;
+            } elseif ($setting->type === 'time') {
+                $value = trim((string) $value);
+                if ($value !== '' && !preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $value)) {
+                    $errors[$key] = $setting->label . ' must be a valid 24-hour time, for example 08:00 or 17:00.';
+                }
+                $value = $value === '' ? null : $value;
             } elseif ($setting->type === 'email') {
                 $value = trim((string) $value);
                 if ($value !== '') {
@@ -74,6 +84,36 @@ class CoreSettingController extends Controller
         }
 
         return redirect()->route('core_settings.index')->with('success', 'Core settings updated.');
+    }
+
+    private function ensureAttendanceSettings(): void
+    {
+        $settings = [
+            [
+                'key' => 'attendance_company_start_time',
+                'group' => 'Attendance',
+                'label' => 'Company Start Time',
+                'value' => '08:00',
+                'type' => 'time',
+                'description' => 'Official daily start time used to calculate late arrival minutes.',
+                'sort_order' => 10,
+                'is_core' => true,
+            ],
+            [
+                'key' => 'attendance_company_close_time',
+                'group' => 'Attendance',
+                'label' => 'Company Close Time',
+                'value' => '17:00',
+                'type' => 'time',
+                'description' => 'Official daily closing time used to calculate early-leave minutes.',
+                'sort_order' => 20,
+                'is_core' => true,
+            ],
+        ];
+
+        foreach ($settings as $setting) {
+            SystemSetting::firstOrCreate(['key' => $setting['key']], $setting);
+        }
     }
 
     private function authorizeSystemAdministrator(Request $request): void
