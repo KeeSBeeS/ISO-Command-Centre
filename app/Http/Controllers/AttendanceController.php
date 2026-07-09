@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\AttendanceCsvImporter;
 use App\Services\AttendanceMailboxImporter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Schema;
 
@@ -107,21 +108,104 @@ class AttendanceController extends Controller
         ]);
     }
 
-    public function show(AttendanceDay $attendanceDay)
+    public function show(Request $request, string $attendanceDay)
     {
         if (!$this->attendanceInstalled()) {
             return redirect()->route('updates.v1_1');
         }
 
-        $records = AttendanceRawRecord::query()
-            ->where('user_id', $attendanceDay->user_id)
-            ->whereDate('attendance_date', $attendanceDay->attendance_date)
-            ->orderBy('recorded_at')
+        $employee = $this->resolveAttendanceEmployee($attendanceDay);
+        abort_unless($employee, 404, 'Employee attendance records not found.');
+
+        $timing = $this->attendanceTiming();
+
+        $firstDate = AttendanceRawRecord::query()->where('user_id', $employee->id)->min('attendance_date')
+            ?: AttendanceDay::query()->where('user_id', $employee->id)->min('attendance_date');
+        $lastDate = AttendanceRawRecord::query()->where('user_id', $employee->id)->max('attendance_date')
+            ?: AttendanceDay::query()->where('user_id', $employee->id)->max('attendance_date');
+
+        $dateFrom = $request->input('date_from') ?: $firstDate;
+        $dateTo = $request->input('date_to') ?: $lastDate;
+
+        $rawBase = AttendanceRawRecord::query()
+            ->with('import')
+            ->where('user_id', $employee->id)
+            ->when($dateFrom, fn ($query) => $query->whereDate('attendance_date', '>=', $dateFrom))
+            ->when($dateTo, fn ($query) => $query->whereDate('attendance_date', '<=', $dateTo))
+            ->when($request->filled('status'), fn ($query) => $query->where('attendance_status', $request->input('status')))
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = $request->string('search');
+                $query->where(function ($nested) use ($search) {
+                    $nested->where('employee_name', 'like', "%{$search}%")
+                        ->orWhere('attendance_status', 'like', "%{$search}%");
+                });
+            });
+
+        $dayBase = AttendanceDay::query()
+            ->where('user_id', $employee->id)
+            ->when($dateFrom, fn ($query) => $query->whereDate('attendance_date', '>=', $dateFrom))
+            ->when($dateTo, fn ($query) => $query->whereDate('attendance_date', '<=', $dateTo));
+
+        $rawRecords = (clone $rawBase)
+            ->orderByDesc('recorded_at')
+            ->paginate(100, ['*'], 'records_page')
+            ->withQueryString();
+
+        $dailySummaries = (clone $dayBase)
+            ->orderByDesc('attendance_date')
+            ->paginate(31, ['*'], 'days_page')
+            ->withQueryString();
+
+        $rawCount = (clone $rawBase)->count();
+        $dayCount = (clone $rawBase)->distinct('attendance_date')->count('attendance_date');
+        $importCount = (clone $rawBase)->whereNotNull('attendance_import_id')->distinct('attendance_import_id')->count('attendance_import_id');
+        $firstRecord = (clone $rawBase)->min('recorded_at');
+        $lastRecord = (clone $rawBase)->max('recorded_at');
+
+        $statusBreakdown = (clone $rawBase)
+            ->select('attendance_status', DB::raw('COUNT(*) as total'))
+            ->groupBy('attendance_status')
+            ->orderByDesc('total')
             ->get();
 
-        $attendanceDay->load('user', 'import');
+        $imports = AttendanceImport::query()
+            ->whereIn('id', (clone $rawBase)->whereNotNull('attendance_import_id')->select('attendance_import_id')->distinct())
+            ->latest()
+            ->limit(10)
+            ->get();
 
-        return view('attendance.show', compact('attendanceDay', 'records'));
+        $lateSummary = ($dateFrom && $dateTo)
+            ? $this->employeeAttendanceSummary($employee->id, $dateFrom, $dateTo, $timing['start_minutes'], $timing['close_minutes'])
+            : [
+                'days' => (clone $dayBase)->count(),
+                'late_days' => 0,
+                'late_minutes' => 0,
+                'late_label' => '0 min',
+                'early_leave_days' => 0,
+                'early_leave_minutes' => 0,
+                'early_leave_label' => '0 min',
+            ];
+
+        return view('attendance.show', [
+            'employee' => $employee,
+            'employeeCode' => $this->attendanceEmployeeRouteValue($employee),
+            'rawRecords' => $rawRecords,
+            'dailySummaries' => $dailySummaries,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'attendanceStartTime' => $timing['start'],
+            'attendanceCloseTime' => $timing['close'],
+            'summary' => [
+                'raw_count' => $rawCount,
+                'day_count' => $dayCount,
+                'import_count' => $importCount,
+                'first_record' => $firstRecord,
+                'last_record' => $lastRecord,
+            ],
+            'statusBreakdown' => $statusBreakdown,
+            'imports' => $imports,
+            'lateSummary' => $lateSummary,
+        ]);
     }
 
     public function upload()
@@ -284,6 +368,28 @@ class AttendanceController extends Controller
             'start_minutes' => $this->minutesFromTime($start),
             'close_minutes' => $this->minutesFromTime($close),
         ];
+    }
+
+    private function resolveAttendanceEmployee(string $identifier): ?User
+    {
+        $identifier = trim(urldecode($identifier));
+
+        return User::query()
+            ->where(function ($query) use ($identifier) {
+                $query->where('employee_code', $identifier)
+                    ->orWhere('attendance_name', $identifier)
+                    ->orWhere('email', $identifier);
+
+                if (is_numeric($identifier)) {
+                    $query->orWhere('id', (int) $identifier);
+                }
+            })
+            ->first();
+    }
+
+    private function attendanceEmployeeRouteValue(User $user): string
+    {
+        return (string) ($user->employee_code ?: $user->id);
     }
 
     private function normaliseTime(?string $value, string $default): string
