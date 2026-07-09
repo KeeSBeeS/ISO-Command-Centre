@@ -47,7 +47,7 @@
                                 <textarea name="settings[{{ $setting->key }}]">{{ old('settings.'.$setting->key, $setting->value) }}</textarea>
                             @else
                                 <input
-                                    type="{{ in_array($setting->type, ['email','url']) ? $setting->type : ($setting->type === 'integer' ? 'number' : 'text') }}"
+                                    type="{{ in_array($setting->type, ['email','url','time']) ? $setting->type : ($setting->type === 'integer' ? 'number' : 'text') }}"
                                     name="settings[{{ $setting->key }}]"
                                     value="{{ old('settings.'.$setting->key, $setting->value) }}">
                             @endif
