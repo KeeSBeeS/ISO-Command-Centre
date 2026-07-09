@@ -421,15 +421,17 @@ class AttendanceCsvImporter
         $query = User::query()->where('status', 'active');
 
         if ($personId) {
-            $personId = $this->cleanPersonId($personId);
+            $personIdCandidates = $this->personIdCandidates($personId);
+
             if (Schema::hasColumn('users', 'employee_code')) {
-                $employee = (clone $query)->where('employee_code', $personId)->first();
+                $employee = (clone $query)->whereIn('employee_code', $personIdCandidates)->first();
                 if ($employee) {
                     return $employee;
                 }
             }
+
             if (Schema::hasColumn('users', 'attendance_employee_code')) {
-                $employee = (clone $query)->where('attendance_employee_code', $personId)->first();
+                $employee = (clone $query)->whereIn('attendance_employee_code', $personIdCandidates)->first();
                 if ($employee) {
                     return $employee;
                 }
@@ -465,6 +467,27 @@ class AttendanceCsvImporter
         $value = trim($value, "' \t\n\r\0\x0B");
 
         return $value !== '' ? $value : null;
+    }
+
+    private function personIdCandidates(?string $personId): array
+    {
+        $clean = $this->cleanPersonId((string) $personId);
+
+        if (!$clean) {
+            return [];
+        }
+
+        $candidates = [$clean];
+
+        if (ctype_digit($clean)) {
+            $stripped = ltrim($clean, '0');
+            if ($stripped !== '') {
+                $candidates[] = $stripped;
+                $candidates[] = str_pad($stripped, 4, '0', STR_PAD_LEFT);
+            }
+        }
+
+        return array_values(array_unique($candidates));
     }
 
     private function cleanCsvValue(?string $value): ?string
