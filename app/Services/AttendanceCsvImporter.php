@@ -8,6 +8,7 @@ use App\Models\AttendanceRawRecord;
 use App\Models\PublicHoliday;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -16,6 +17,8 @@ class AttendanceCsvImporter
 {
     public function importString(string $csvContent, array $meta = []): AttendanceImport
     {
+        $this->ensureRawRecordDetailColumns();
+
         return DB::transaction(function () use ($csvContent, $meta) {
             $import = AttendanceImport::create([
                 'source' => $meta['source'] ?? 'upload',
@@ -30,7 +33,7 @@ class AttendanceCsvImporter
                 'skipped_rows' => 0,
                 'day_rows' => 0,
                 'status' => 'processing',
-                'notes' => null,
+                'notes' => null
             ]);
 
             [$headers, $rows] = $this->readCsv($csvContent);
@@ -63,6 +66,7 @@ class AttendanceCsvImporter
 
     private function importEventLogRows(array $headers, array $rows, AttendanceImport $import): array
     {
+        $personIdIndex = $this->findHeader($headers, ['person id', 'employee id', 'employee code', 'code']);
         $nameIndex = $this->findHeader($headers, ['name']);
         $timeIndex = $this->findHeader($headers, ['time']);
         $statusIndex = $this->findHeader($headers, ['attendance status', 'status']);
@@ -91,14 +95,16 @@ class AttendanceCsvImporter
             $rawRows++;
             $name = trim((string) ($row[$nameIndex] ?? ''));
             $timeValue = trim((string) ($row[$timeIndex] ?? ''));
-            $status = $statusIndex !== null ? trim((string) ($row[$statusIndex] ?? '')) : null;
+            $status = $statusIndex !== null ? $this->cleanCsvValue((string) ($row[$statusIndex] ?? '')) : null;
+            $personId = $personIdIndex !== null ? $this->cleanPersonId((string) ($row[$personIdIndex] ?? '')) : null;
+            $details = $this->extractCsvDetails($headers, $row);
 
             if ($name === '' || $timeValue === '') {
                 $skippedRows++;
                 continue;
             }
 
-            $employee = $this->findEmployee($name);
+            $employee = $this->findEmployee($name, $personId);
             if (!$employee) {
                 $skippedRows++;
                 continue;
@@ -110,14 +116,15 @@ class AttendanceCsvImporter
                 continue;
             }
 
-            $created = $this->storeRawRecord($import, $employee, $name, $status, $recordedAt, 'event');
-            if ($created) {
+            $stored = $this->storeRawRecord($import, $employee, $name, $status, $recordedAt, 'event', $details);
+            if ($stored) {
                 $matchedRows++;
             }
 
             $affected[$employee->id . '|' . $recordedAt->toDateString()] = [
                 'user_id' => $employee->id,
                 'date' => $recordedAt->toDateString(),
+                'import_id' => $import->id,
             ];
         }
 
@@ -129,7 +136,7 @@ class AttendanceCsvImporter
             'skipped_rows' => $skippedRows,
             'day_rows' => $dayRows,
             'failed' => false,
-            'notes' => $this->importNotes($skippedRows, 'event-log CSV'),
+            'notes' => $this->importNotes($skippedRows, 'event-log CSV with full raw detail capture'),
         ];
     }
 
@@ -188,21 +195,22 @@ class AttendanceCsvImporter
                 continue;
             }
 
-            $status = $statusIndex !== null ? trim((string) ($row[$statusIndex] ?? '')) : null;
+            $details = $this->extractCsvDetails($headers, $row);
+            $status = $statusIndex !== null ? $this->cleanCsvValue((string) ($row[$statusIndex] ?? '')) : null;
             $checkInValues = $this->extractTimeValues((string) ($row[$checkInIndex] ?? ''));
             $checkOutValues = $checkOutIndex !== null ? $this->extractTimeValues((string) ($row[$checkOutIndex] ?? '')) : [];
             $timesStored = 0;
 
             foreach ($checkInValues as $timeValue) {
                 $recordedAt = $this->combineDateAndTime($date, $timeValue);
-                if ($recordedAt && $this->storeRawRecord($import, $employee, $name, trim(($status ?: 'Attendance') . ' Check-In'), $recordedAt, 'check-in')) {
+                if ($recordedAt && $this->storeRawRecord($import, $employee, $name, trim(($status ?: 'Attendance') . ' Check-In'), $recordedAt, 'check-in', $details)) {
                     $timesStored++;
                 }
             }
 
             foreach ($checkOutValues as $timeValue) {
                 $recordedAt = $this->combineDateAndTime($date, $timeValue);
-                if ($recordedAt && $this->storeRawRecord($import, $employee, $name, trim(($status ?: 'Attendance') . ' Check-Out'), $recordedAt, 'check-out')) {
+                if ($recordedAt && $this->storeRawRecord($import, $employee, $name, trim(($status ?: 'Attendance') . ' Check-Out'), $recordedAt, 'check-out', $details)) {
                     $timesStored++;
                 }
             }
@@ -251,23 +259,45 @@ class AttendanceCsvImporter
         return $dayRows;
     }
 
-    private function storeRawRecord(AttendanceImport $import, User $employee, string $name, ?string $status, Carbon $recordedAt, string $eventType): bool
+    private function storeRawRecord(AttendanceImport $import, User $employee, string $name, ?string $status, Carbon $recordedAt, string $eventType, array $details = []): bool
     {
         $hash = $this->rowHash($employee->id, $name, $recordedAt->format('Y-m-d H:i:s'), $status, $eventType);
+        $detailPayload = $this->rawRecordDetailPayload($details);
+        $payload = array_merge([
+            'attendance_import_id' => $import->id,
+            'user_id' => $employee->id,
+            'employee_name' => $name,
+            'attendance_status' => $status ?: null,
+            'recorded_at' => $recordedAt,
+            'attendance_date' => $recordedAt->toDateString(),
+        ], $detailPayload);
 
         $record = AttendanceRawRecord::firstOrCreate(
             ['source_row_hash' => $hash],
-            [
-                'attendance_import_id' => $import->id,
-                'user_id' => $employee->id,
-                'employee_name' => $name,
-                'attendance_status' => $status ?: null,
-                'recorded_at' => $recordedAt,
-                'attendance_date' => $recordedAt->toDateString(),
-            ]
+            $payload
         );
 
-        return $record->wasRecentlyCreated;
+        if ($record->wasRecentlyCreated) {
+            return true;
+        }
+
+        $update = $detailPayload;
+        if (!$record->attendance_import_id) {
+            $update['attendance_import_id'] = $import->id;
+        }
+        if (!$record->user_id) {
+            $update['user_id'] = $employee->id;
+        }
+
+        if (!empty($update)) {
+            $record->fill($update);
+            if ($record->isDirty()) {
+                $record->save();
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function upsertNoPunchDay(User $employee, string $date, ?int $importId, string $sourceName, ?string $status): bool
@@ -435,6 +465,103 @@ class AttendanceCsvImporter
         $value = trim($value, "' \t\n\r\0\x0B");
 
         return $value !== '' ? $value : null;
+    }
+
+    private function cleanCsvValue(?string $value): ?string
+    {
+        $value = trim((string) $value);
+        return $value !== '' ? $value : null;
+    }
+
+    private function valueForHeader(array $headers, array $row, array $names): ?string
+    {
+        $index = $this->findHeader($headers, $names);
+        if ($index === null) {
+            return null;
+        }
+
+        return $this->cleanCsvValue((string) ($row[$index] ?? ''));
+    }
+
+    private function extractCsvDetails(array $headers, array $row): array
+    {
+        return [
+            'person_id' => $this->cleanPersonId((string) ($this->valueForHeader($headers, $row, ['person id', 'employee id', 'employee code', 'code']) ?? '')),
+            'department' => $this->valueForHeader($headers, $row, ['department']),
+            'attendance_check_point' => $this->valueForHeader($headers, $row, ['attendance check point', 'check point', 'checkpoint']),
+            'custom_name' => $this->valueForHeader($headers, $row, ['custom name']),
+            'data_source' => $this->valueForHeader($headers, $row, ['data source', 'source']),
+            'handling_type' => $this->valueForHeader($headers, $row, ['handling type']),
+            'temperature' => $this->valueForHeader($headers, $row, ['temperature']),
+            'abnormal' => $this->valueForHeader($headers, $row, ['abnormal']),
+            'raw_payload' => $this->rowPayload($headers, $row),
+        ];
+    }
+
+    private function rowPayload(array $headers, array $row): array
+    {
+        $payload = [];
+        foreach ($headers as $index => $header) {
+            $key = trim((string) $header) ?: 'column_' . $index;
+            $payload[$key] = $row[$index] ?? null;
+        }
+
+        return $payload;
+    }
+
+    private function rawRecordDetailPayload(array $details): array
+    {
+        if (!Schema::hasTable('attendance_raw_records')) {
+            return [];
+        }
+
+        $allowed = [
+            'person_id',
+            'department',
+            'attendance_check_point',
+            'custom_name',
+            'data_source',
+            'handling_type',
+            'temperature',
+            'abnormal',
+            'raw_payload',
+        ];
+
+        $payload = [];
+        foreach ($allowed as $column) {
+            if (array_key_exists($column, $details) && Schema::hasColumn('attendance_raw_records', $column)) {
+                $payload[$column] = $details[$column];
+            }
+        }
+
+        return $payload;
+    }
+
+    private function ensureRawRecordDetailColumns(): void
+    {
+        if (!Schema::hasTable('attendance_raw_records')) {
+            return;
+        }
+
+        $columns = [
+            'person_id' => fn (Blueprint $table) => $table->string('person_id')->nullable()->index()->after('user_id'),
+            'department' => fn (Blueprint $table) => $table->string('department')->nullable()->after('employee_name'),
+            'attendance_check_point' => fn (Blueprint $table) => $table->string('attendance_check_point')->nullable()->after('attendance_status'),
+            'custom_name' => fn (Blueprint $table) => $table->string('custom_name')->nullable()->after('attendance_check_point'),
+            'data_source' => fn (Blueprint $table) => $table->string('data_source')->nullable()->after('custom_name'),
+            'handling_type' => fn (Blueprint $table) => $table->string('handling_type')->nullable()->after('data_source'),
+            'temperature' => fn (Blueprint $table) => $table->string('temperature')->nullable()->after('handling_type'),
+            'abnormal' => fn (Blueprint $table) => $table->string('abnormal')->nullable()->after('temperature'),
+            'raw_payload' => fn (Blueprint $table) => $table->longText('raw_payload')->nullable()->after('source_row_hash'),
+        ];
+
+        foreach ($columns as $column => $definition) {
+            if (!Schema::hasColumn('attendance_raw_records', $column)) {
+                Schema::table('attendance_raw_records', function (Blueprint $table) use ($definition) {
+                    $definition($table);
+                });
+            }
+        }
     }
 
     private function parseDate(string $value): ?Carbon
