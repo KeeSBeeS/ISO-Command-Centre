@@ -275,8 +275,8 @@ class AttendanceController extends Controller
 
     private function attendanceTiming(): array
     {
-        $start = $this->normaliseTime(SystemSetting::valueFor('attendance_company_start_time', '08:00'), '08:00');
-        $close = $this->normaliseTime(SystemSetting::valueFor('attendance_company_close_time', '17:00'), '17:00');
+        $start = $this->normaliseTime(SystemSetting::valueFor('attendance_company_start_time', '06:00'), '06:00');
+        $close = $this->normaliseTime(SystemSetting::valueFor('attendance_company_close_time', '15:00'), '15:00');
 
         return [
             'start' => $start,
