@@ -13,6 +13,27 @@
     <a class="btn" href="{{ route('attendance.imports') }}">Import History</a>
 </div>
 
+@if($selectedEmployee)
+    <div class="card" style="margin-bottom:16px">
+        <div class="page-head-main" style="justify-content:space-between;gap:16px;align-items:flex-start">
+            <div>
+                <h2 style="margin:0">{{ $selectedEmployee->name }} Attendance Entries</h2>
+                <p class="muted small" style="margin:6px 0 0">
+                    Showing all entries for this employee in the selected period. Company time rules: start {{ $attendanceStartTime }}, close {{ $attendanceCloseTime }}.
+                </p>
+            </div>
+            <a class="btn" href="{{ route('attendance.index') }}">Clear Employee Filter</a>
+        </div>
+        <div class="grid cols-4" style="margin-top:14px">
+            <div class="card metric"><span>Attendance Days</span><strong>{{ $employeeAttendanceSummary['days'] }}</strong></div>
+            <div class="card metric"><span>Late Days</span><strong>{{ $employeeAttendanceSummary['late_days'] }}</strong></div>
+            <div class="card metric"><span>Total Late Time</span><strong style="font-size:22px">{{ $employeeAttendanceSummary['late_label'] }}</strong></div>
+            <div class="card metric"><span>Early Leave Days</span><strong>{{ $employeeAttendanceSummary['early_leave_days'] }}</strong></div>
+            <div class="card metric"><span>Total Early Leave</span><strong style="font-size:22px">{{ $employeeAttendanceSummary['early_leave_label'] }}</strong></div>
+        </div>
+    </div>
+@endif
+
 <div class="grid cols-4">
     <div class="card metric"><span>Employees Present</span><strong>{{ $presentCount }}</strong></div>
     <div class="card metric"><span>Absent / No Punch</span><strong>{{ $absentCount ?? 0 }}</strong></div>
@@ -27,6 +48,9 @@
 
 <div class="card">
     <form method="get" class="form-grid">
+        @if($selectedEmployee)
+            <input type="hidden" name="employee_id" value="{{ $selectedEmployee->id }}">
+        @endif
         <div class="form-row"><label>Date From</label><input type="date" name="date_from" value="{{ $dateFrom }}"></div>
         <div class="form-row"><label>Date To</label><input type="date" name="date_to" value="{{ $dateTo }}"></div>
         <div class="form-row"><label>Employee Search</label><input type="text" name="search" value="{{ request('search') }}" placeholder="Name, attendance name or email"></div>
@@ -38,7 +62,7 @@
 
 <div class="card">
     <h2>Daily Attendance Summary</h2>
-    <p class="muted small">Clock-in is accepted until 09:00. If more than one record exists before 09:00, the earliest one is kept as check-in. If no record exists before 09:00, the earliest available time is flagged late. Latest different time is used as checkout. Public holidays are company-closed days and are retained for audit only. This page defaults to the latest imported attendance date when no filter is selected.</p>
+    <p class="muted small">Company start time is {{ $attendanceStartTime }} and company close time is {{ $attendanceCloseTime }}. Click an employee name to open all attendance entries for that employee and see total late and early-leave time. All matched raw CSV punch records are retained for drill-down and audit.</p>
     <div class="table-wrap">
         <table>
             <thead><tr><th>Date</th><th>Employee</th><th>Start</th><th>Checkout</th><th>Hours</th><th>Records</th><th>Status</th><th></th></tr></thead>
@@ -46,7 +70,10 @@
             @forelse($days as $day)
                 <tr>
                     <td>{{ optional($day->attendance_date)->format('Y-m-d') }}</td>
-                    <td><strong>{{ $day->user->name }}</strong><br><span class="muted small">{{ $day->source_names }}</span></td>
+                    <td>
+                        <a href="{{ route('attendance.index', ['employee_id' => $day->user_id]) }}"><strong>{{ $day->user->name }}</strong></a><br>
+                        <span class="muted small">{{ $day->source_names }}</span>
+                    </td>
                     <td>{{ optional($day->start_time)->format('H:i:s') ?? '-' }}<br><span class="muted small">{{ $day->first_status }}</span></td>
                     <td>{{ optional($day->end_time)->format('H:i:s') ?? '-' }}<br><span class="muted small">{{ $day->last_status }}</span></td>
                     <td>{{ $day->work_hours }}</td>
