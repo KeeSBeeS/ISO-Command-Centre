@@ -124,8 +124,12 @@ class AttendanceController extends Controller
         $lastDate = AttendanceRawRecord::query()->where('user_id', $employee->id)->max('attendance_date')
             ?: AttendanceDay::query()->where('user_id', $employee->id)->max('attendance_date');
 
-        $dateFrom = $request->input('date_from') ?: $firstDate;
-        $dateTo = $request->input('date_to') ?: $lastDate;
+        $dateFrom = $request->filled('date_from') ? $request->input('date_from') : null;
+        $dateTo = $request->filled('date_to') ? $request->input('date_to') : null;
+        $historyDateFrom = $firstDate;
+        $historyDateTo = $lastDate;
+        $activeDateFrom = $dateFrom ?: $historyDateFrom;
+        $activeDateTo = $dateTo ?: $historyDateTo;
 
         $rawBase = AttendanceRawRecord::query()
             ->with('import')
@@ -134,10 +138,16 @@ class AttendanceController extends Controller
             ->when($dateTo, fn ($query) => $query->whereDate('attendance_date', '<=', $dateTo))
             ->when($request->filled('status'), fn ($query) => $query->where('attendance_status', $request->input('status')))
             ->when($request->filled('search'), function ($query) use ($request) {
-                $search = $request->string('search');
+                $search = (string) $request->string('search');
                 $query->where(function ($nested) use ($search) {
                     $nested->where('employee_name', 'like', "%{$search}%")
                         ->orWhere('attendance_status', 'like', "%{$search}%");
+
+                    foreach (['person_id', 'department', 'attendance_check_point', 'custom_name', 'data_source', 'handling_type', 'temperature', 'abnormal'] as $column) {
+                        if (Schema::hasColumn('attendance_raw_records', $column)) {
+                            $nested->orWhere($column, 'like', "%{$search}%");
+                        }
+                    }
                 });
             });
 
@@ -154,6 +164,18 @@ class AttendanceController extends Controller
         $dailySummaries = (clone $dayBase)
             ->orderByDesc('attendance_date')
             ->paginate(31, ['*'], 'days_page')
+            ->withQueryString();
+
+        $punchHistory = (clone $rawBase)
+            ->select(
+                'attendance_date',
+                DB::raw('COUNT(*) as total_records'),
+                DB::raw('MIN(recorded_at) as first_punch'),
+                DB::raw('MAX(recorded_at) as last_punch')
+            )
+            ->groupBy('attendance_date')
+            ->orderByDesc('attendance_date')
+            ->paginate(60, ['*'], 'history_page')
             ->withQueryString();
 
         $rawCount = (clone $rawBase)->count();
@@ -174,8 +196,8 @@ class AttendanceController extends Controller
             ->limit(10)
             ->get();
 
-        $lateSummary = ($dateFrom && $dateTo)
-            ? $this->employeeAttendanceSummary($employee->id, $dateFrom, $dateTo, $timing['start_minutes'], $timing['close_minutes'])
+        $lateSummary = ($activeDateFrom && $activeDateTo)
+            ? $this->employeeAttendanceSummary($employee->id, $activeDateFrom, $activeDateTo, $timing['start_minutes'], $timing['close_minutes'])
             : [
                 'days' => (clone $dayBase)->count(),
                 'late_days' => 0,
@@ -191,8 +213,13 @@ class AttendanceController extends Controller
             'employeeCode' => $this->attendanceEmployeeRouteValue($employee),
             'rawRecords' => $rawRecords,
             'dailySummaries' => $dailySummaries,
+            'punchHistory' => $punchHistory,
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
+            'historyDateFrom' => $historyDateFrom,
+            'historyDateTo' => $historyDateTo,
+            'activeDateFrom' => $activeDateFrom,
+            'activeDateTo' => $activeDateTo,
             'attendanceStartTime' => $timing['start'],
             'attendanceCloseTime' => $timing['close'],
             'summary' => [
@@ -373,18 +400,51 @@ class AttendanceController extends Controller
     private function resolveAttendanceEmployee(string $identifier): ?User
     {
         $identifier = trim(urldecode($identifier));
+        $candidates = $this->employeeCodeCandidates($identifier);
 
         return User::query()
-            ->where(function ($query) use ($identifier) {
-                $query->where('employee_code', $identifier)
-                    ->orWhere('attendance_name', $identifier)
-                    ->orWhere('email', $identifier);
+            ->where(function ($query) use ($identifier, $candidates) {
+                if (Schema::hasColumn('users', 'employee_code')) {
+                    $query->whereIn('employee_code', $candidates);
+                }
+
+                if (Schema::hasColumn('users', 'attendance_employee_code')) {
+                    $query->orWhereIn('attendance_employee_code', $candidates);
+                }
+
+                if (Schema::hasColumn('users', 'attendance_name')) {
+                    $query->orWhere('attendance_name', $identifier);
+                }
+
+                $query->orWhere('email', $identifier);
 
                 if (is_numeric($identifier)) {
                     $query->orWhere('id', (int) $identifier);
                 }
             })
             ->first();
+    }
+
+    private function employeeCodeCandidates(string $identifier): array
+    {
+        $clean = trim($identifier);
+        $clean = trim($clean, "' \t\n\r\0\x0B");
+
+        if ($clean === '') {
+            return [$identifier];
+        }
+
+        $candidates = [$identifier, $clean];
+
+        if (ctype_digit($clean)) {
+            $stripped = ltrim($clean, '0');
+            if ($stripped !== '') {
+                $candidates[] = $stripped;
+                $candidates[] = str_pad($stripped, 4, '0', STR_PAD_LEFT);
+            }
+        }
+
+        return array_values(array_unique(array_filter($candidates, fn ($value) => $value !== '')));
     }
 
     private function attendanceEmployeeRouteValue(User $user): string
