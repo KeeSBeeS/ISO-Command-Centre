@@ -29,7 +29,7 @@
 <div style="height:16px"></div>
 
 <div class="alert warning">
-    This page now displays the full CSV record detail where available: Person ID, Department, Attendance Check Point, Custom Name, Data Source, Handling Type, Temperature and Abnormal. For older imports, re-import the same CSV after this update to backfill the extra fields onto existing raw records.
+    This page is now a full employee attendance history. By default it shows all imported records for the employee from the first available punch to the latest available punch. Use the date filters only when you want to narrow the history.
 </div>
 
 <div class="card">
@@ -62,6 +62,33 @@
             <a class="btn full" href="{{ route('attendance.show', $employeeCode) }}">Clear Filters</a>
         </div>
     </form>
+</div>
+
+<div style="height:16px"></div>
+
+<div class="card history-range-card">
+    <div class="page-head-main" style="justify-content:space-between;gap:16px;align-items:flex-start">
+        <div>
+            <h2 style="margin:0">Attendance History Range</h2>
+            <p class="muted small" style="margin:6px 0 0">
+                Full employee history:
+                <strong>{{ $historyDateFrom ?: 'No first record' }}</strong>
+                to
+                <strong>{{ $historyDateTo ?: 'No latest record' }}</strong>.
+                @if($dateFrom || $dateTo)
+                    Current filter:
+                    <strong>{{ $dateFrom ?: 'Start' }}</strong>
+                    to
+                    <strong>{{ $dateTo ?: 'Latest' }}</strong>.
+                @else
+                    No date filter is active.
+                @endif
+            </p>
+        </div>
+        @if($dateFrom || $dateTo || request('status') || request('search'))
+            <a class="btn" href="{{ route('attendance.show', $employeeCode) }}">Show Full History</a>
+        @endif
+    </div>
 </div>
 
 <div style="height:16px"></div>
@@ -103,6 +130,31 @@
 <div style="height:16px"></div>
 
 <div class="card">
+    <h2>Punch History by Date</h2>
+    <p class="muted small">This is the employee history built from raw imported punch records. It shows every date with records, even when the rebuilt daily summary is missing or incomplete.</p>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Date</th><th>First Punch</th><th>Last Punch</th><th>Total Imported Records</th></tr></thead>
+            <tbody>
+            @forelse($punchHistory as $historyDay)
+                <tr>
+                    <td><strong>{{ optional($historyDay->attendance_date)->format('Y-m-d') }}</strong></td>
+                    <td>{{ $historyDay->first_punch ? \Illuminate\Support\Carbon::parse($historyDay->first_punch)->format('H:i:s') : '-' }}</td>
+                    <td>{{ $historyDay->last_punch ? \Illuminate\Support\Carbon::parse($historyDay->last_punch)->format('H:i:s') : '-' }}</td>
+                    <td>{{ $historyDay->total_records }}</td>
+                </tr>
+            @empty
+                <tr><td colspan="4" class="muted">No raw punch history found for this employee and filter.</td></tr>
+            @endforelse
+            </tbody>
+        </table>
+    </div>
+    <div class="pagination">{{ $punchHistory->links() }}</div>
+</div>
+
+<div style="height:16px"></div>
+
+<div class="card">
     <h2>Import Sources</h2>
     <p class="muted small">Latest import batches that produced records for this employee.</p>
     <div class="table-wrap">
@@ -130,7 +182,7 @@
 
 <div class="card">
     <h2>Daily Attendance Summary</h2>
-    <p class="muted small">Daily rebuilt attendance records for this employee. These are the grouped day summaries created from the raw imported punches.</p>
+    <p class="muted small">Daily rebuilt attendance summaries for this employee. The punch history above is the source of truth for the employee's full history; this section is the grouped daily calculation.</p>
     <div class="table-wrap">
         <table>
             <thead><tr><th>Date</th><th>Start</th><th>Checkout</th><th>Hours</th><th>Records</th><th>Status</th><th>Source Names</th></tr></thead>
@@ -221,6 +273,7 @@
     .employee-attendance-hero{background:linear-gradient(135deg,rgba(15,23,42,.04),rgba(59,130,246,.06))}
     .status-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid rgba(148,163,184,.18)}
     .status-row:last-child{border-bottom:none}
+    .history-range-card{background:linear-gradient(135deg,rgba(14,165,233,.06),rgba(34,197,94,.05))}
     .wide-record-table{overflow-x:auto}
     .wide-record-table table{min-width:1450px}
 </style>
