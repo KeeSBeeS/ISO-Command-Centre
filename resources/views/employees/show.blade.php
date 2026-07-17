@@ -131,6 +131,21 @@
 <div style="height:14px"></div>
 @endif
 
+@php
+    $vehiclePolicyValid = false;
+
+    if (\Illuminate\Support\Facades\Schema::hasTable('employee_documents') && $employee->relationLoaded('documents')) {
+        $vehiclePolicyValid = $employee->documents
+            ->where('document_type', 'vehicle_policy')
+            ->where('status', 'active')
+            ->contains(function ($document) {
+                return !$document->has_expiry
+                    || !$document->expires_at
+                    || $document->expires_at->gte(now()->startOfDay());
+            });
+    }
+@endphp
+
 @if(\Illuminate\Support\Facades\Schema::hasTable('vehicle_assignments') && auth()->user()->hasPermission('vehicle.view'))
 <div class="card">
     <div class="actions" style="justify-content:space-between">
@@ -149,9 +164,6 @@
                         <td><strong>{{ optional($assignment->vehicle)->display_name ?? 'Unknown vehicle' }}</strong><br><span class="muted small">Reg: {{ optional($assignment->vehicle)->registration_number ?? 'Not set' }}</span></td>
                         <td>{{ optional($assignment->assigned_at)->format('Y-m-d H:i') }}</td>
                         <td>
-                            @php
-                                $vehiclePolicyValid = $employee->documents->where('document_type','vehicle_policy')->where('status','active')->filter(function($doc){ return !$doc->has_expiry || !$doc->expires_at || $doc->expires_at->gte(now()->toDateString()); })->count() > 0;
-                            @endphp
                             @if($vehiclePolicyValid)
                                 <span class="pill">Vehicle Policy Valid</span>
                             @else
