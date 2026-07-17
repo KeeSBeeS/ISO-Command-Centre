@@ -164,7 +164,7 @@
                         <td><strong>{{ optional($assignment->vehicle)->display_name ?? 'Unknown vehicle' }}</strong><br><span class="muted small">Reg: {{ optional($assignment->vehicle)->registration_number ?? 'Not set' }}</span></td>
                         <td>{{ optional($assignment->assigned_at)->format('Y-m-d H:i') }}</td>
                         <td>
-                            @if($vehiclePolicyValid)
+                            @if($vehiclePolicyValid ?? false)
                                 <span class="pill">Vehicle Policy Valid</span>
                             @else
                                 <span class="pill off">Vehicle Policy Outstanding</span>
