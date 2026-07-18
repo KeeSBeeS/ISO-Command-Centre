@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.8.6
+
+Employee documents redesign.
+
+- Removed two obsolete one-use hotfix scripts from `public/` that exposed a hardcoded-key live file-rewrite endpoint (`iso-employee-policy-hotfix.php`, `iso-employee-policy-view-hotfix.php`). The bug they patched is already fixed in the active controller/view.
+- Redesigned the employee profile "Employee Documents" card with status stat tiles, urgency-based sorting and red/amber/green expiry status colours.
+- Added plain-language expiry summaries ("Expires in 12 days", "Expired 3 days ago") across the employee profile, personal profile and reminders centre.
+- Added the ability to edit an existing employee document (type, title, expiry, reminder lead time, notes, optional file replacement) via a shared create/edit form partial with a live reminder-date preview.
+- Added the ability to reactivate an inactive document and to permanently delete a document (removes the stored file), alongside the existing mark-inactive action.
+- Added summary counts to the Document Reminders centre for each filter.
+- No database schema changes; reminders and calendar integration behaviour are unchanged.
+
 ## v2.8.0 Foreign Key Hotfix
 
 - Fixed MySQL error `1059 Identifier name is too long` during the v2.8.0 update.
