@@ -3,7 +3,7 @@
 @section('page_title','Add Fuel-up')
 @section('content')
 <style>
-    .fuel-select-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.fuel-card{border:1px solid var(--line);border-radius:18px;padding:16px;background:rgba(255,255,255,.045);box-shadow:var(--shadow-soft)}.fuel-card h3{margin:0 0 6px}.fuel-meta{display:grid;gap:6px;margin:12px 0}.fuel-meta span{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:13px}.fuel-meta strong{color:var(--text);font-weight:800}@media(max-width:980px){.fuel-select-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:640px){.fuel-select-grid{grid-template-columns:1fr}}
+    .fuel-select-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.fuel-card{border:1px solid var(--line);border-radius:18px;padding:16px;background:rgba(15,23,42,.045);box-shadow:var(--shadow-soft)}.fuel-card h3{margin:0 0 6px}.fuel-meta{display:grid;gap:6px;margin:12px 0}.fuel-meta span{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:13px}.fuel-meta strong{color:var(--text);font-weight:800}@media(max-width:980px){.fuel-select-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:640px){.fuel-select-grid{grid-template-columns:1fr}}
 </style>
 
 <div class="card">
