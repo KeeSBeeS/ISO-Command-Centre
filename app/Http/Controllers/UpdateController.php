@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Database\Schema\Blueprint;
@@ -2073,10 +2074,11 @@ class UpdateController extends Controller
     {
         $this->addV286CustomerCrmTables();
         $this->seedV286Permissions();
+        $this->removeV286OrphanedClientFiles();
         $this->seedV286Version();
         $this->seedSystemAdministratorAllPermissions($request->user());
 
-        return redirect()->route('updates.v2_8_6')->with('success', 'Version 2.8.6 applied. Customers now have a full CRM: sites/locations, contacts and an interaction/activity log.');
+        return redirect()->route('updates.v2_8_6')->with('success', 'Version 2.8.6 applied. Customers now have a full CRM: sites/locations, contacts and an interaction/activity log. The old, unused Clients screens were removed automatically.');
     }
 
     private function addV286CustomerCrmTables(): void
@@ -2186,6 +2188,19 @@ class UpdateController extends Controller
         Role::whereIn('slug', ['system-administrator', 'director', 'manager'])->get()->each(function (Role $role) use ($permissionIds) {
             $role->permissions()->syncWithoutDetaching($permissionIds);
         });
+    }
+
+    private function removeV286OrphanedClientFiles(): void
+    {
+        $controllerPath = app_path('Http/Controllers/ClientController.php');
+        if (File::exists($controllerPath)) {
+            File::delete($controllerPath);
+        }
+
+        $viewsPath = resource_path('views/clients');
+        if (File::isDirectory($viewsPath)) {
+            File::deleteDirectory($viewsPath);
+        }
     }
 
     private function seedV286Version(): void
