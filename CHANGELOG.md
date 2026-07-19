@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.8.8
+
+Employee profile crash fix (drift correction, not a new bug).
+
+- Fixed `RelationNotFoundException: Call to undefined relationship [documentType] on model [App\Models\EmployeeDocument]` on the employee profile page.
+- Same root cause as v2.8.7: a live-only leftover from the abandoned, documentation-only v2.8.0 compliance work. The `EmployeeController.php` in this repository has never referenced `documentType`; the live server's copy had drifted from git.
+- Re-ships the correct `app/Http/Controllers/EmployeeController.php` (unchanged from v2.8.6) so it overwrites the stale live copy. No database or permission changes.
+- Flagged that this is the second such drift-caused crash in a row; offered to package a full (non-diff) baseline of employee/document/compliance files to prevent further surprises from the same abandoned feature.
+
 ## v2.8.7
 
 Employee Compliance Overview (fixes broken dashboard link).
