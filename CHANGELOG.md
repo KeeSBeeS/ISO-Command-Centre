@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.8.6
+
+Customer CRM update.
+
+- Extended Customers with type (customer/prospect/supplier/partner/other), industry, website and an assignable account manager.
+- Added customer sites/locations, replacing the never-deployed "Clients" module with a supported one built on the live Customers table.
+- Added customer contacts at both the company level and the site level, with role/type, primary flag and status.
+- Added a customer interactions/activity log (calls, emails, meetings, site visits, tasks and notes) with optional follow-up dates; overdue follow-ups are highlighted on the customer profile.
+- Added permissions `customer_sites.manage`, `customer_contacts.manage` and `customer_interactions.manage`; synced to System Administrator, Director and Manager roles.
+- Removed the orphaned `ClientController` and `clients` views, which had no route and were never reachable.
+
 ## v2.8.0 Foreign Key Hotfix
 
 - Fixed MySQL error `1059 Identifier name is too long` during the v2.8.0 update.

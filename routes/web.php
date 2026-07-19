@@ -213,6 +213,13 @@ Route::middleware([EnsureInstalled::class])->group(function () {
             ->middleware(CheckPermission::class . ':settings.manage')
             ->name('updates.v2_6_11.apply');
 
+        Route::get('/updates/v2-8-6', [UpdateController::class, 'v286'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_8_6');
+        Route::post('/updates/v2-8-6', [UpdateController::class, 'applyV286'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_8_6.apply');
+
         Route::get('/profile', [ProfileController::class, 'show'])
             ->middleware(CheckPermission::class . ':profile.view')
             ->name('profile.show');
@@ -436,6 +443,39 @@ Route::middleware([EnsureInstalled::class])->group(function () {
             ->name('customers.destroy');
         Route::get('/clients', [CustomerController::class, 'index'])
             ->middleware(CheckPermission::class . ':clients.view');
+
+        Route::post('/customers/{customer}/sites', [CustomerController::class, 'storeSite'])
+            ->middleware(CheckPermission::class . ':customer_sites.manage')
+            ->name('customers.sites.store');
+        Route::put('/customers/{customer}/sites/{site}', [CustomerController::class, 'updateSite'])
+            ->middleware(CheckPermission::class . ':customer_sites.manage')
+            ->name('customers.sites.update');
+        Route::delete('/customers/{customer}/sites/{site}', [CustomerController::class, 'destroySite'])
+            ->middleware(CheckPermission::class . ':customer_sites.manage')
+            ->name('customers.sites.destroy');
+
+        Route::post('/customers/{customer}/contacts', [CustomerController::class, 'storeContact'])
+            ->middleware(CheckPermission::class . ':customer_contacts.manage')
+            ->name('customers.contacts.store');
+        Route::post('/customers/{customer}/sites/{site}/contacts', [CustomerController::class, 'storeSiteContact'])
+            ->middleware(CheckPermission::class . ':customer_contacts.manage')
+            ->name('customers.sites.contacts.store');
+        Route::put('/customers/{customer}/contacts/{contact}', [CustomerController::class, 'updateContact'])
+            ->middleware(CheckPermission::class . ':customer_contacts.manage')
+            ->name('customers.contacts.update');
+        Route::delete('/customers/{customer}/contacts/{contact}', [CustomerController::class, 'destroyContact'])
+            ->middleware(CheckPermission::class . ':customer_contacts.manage')
+            ->name('customers.contacts.destroy');
+
+        Route::post('/customers/{customer}/interactions', [CustomerController::class, 'storeInteraction'])
+            ->middleware(CheckPermission::class . ':customer_interactions.manage')
+            ->name('customers.interactions.store');
+        Route::put('/customers/{customer}/interactions/{interaction}', [CustomerController::class, 'updateInteraction'])
+            ->middleware(CheckPermission::class . ':customer_interactions.manage')
+            ->name('customers.interactions.update');
+        Route::delete('/customers/{customer}/interactions/{interaction}', [CustomerController::class, 'destroyInteraction'])
+            ->middleware(CheckPermission::class . ':customer_interactions.manage')
+            ->name('customers.interactions.destroy');
 
         Route::get('/employees', [EmployeeController::class, 'index'])
             ->middleware(CheckPermission::class . ':employees.view')

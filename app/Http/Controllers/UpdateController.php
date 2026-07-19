@@ -2059,4 +2059,153 @@ class UpdateController extends Controller
         }
     }
 
+    public function v286()
+    {
+        $systemVersion = Schema::hasTable('system_settings')
+            ? DB::table('system_settings')->where('key', 'platform_version')->value('value')
+            : null;
+        $customerCrmReady = Schema::hasTable('customer_sites') && Schema::hasTable('customer_contacts') && Schema::hasTable('customer_interactions');
+
+        return view('updates.v2_8_6', compact('systemVersion', 'customerCrmReady'));
+    }
+
+    public function applyV286(Request $request)
+    {
+        $this->addV286CustomerCrmTables();
+        $this->seedV286Permissions();
+        $this->seedV286Version();
+        $this->seedSystemAdministratorAllPermissions($request->user());
+
+        return redirect()->route('updates.v2_8_6')->with('success', 'Version 2.8.6 applied. Customers now have a full CRM: sites/locations, contacts and an interaction/activity log.');
+    }
+
+    private function addV286CustomerCrmTables(): void
+    {
+        if (Schema::hasTable('customers')) {
+            Schema::table('customers', function (Blueprint $table) {
+                if (!Schema::hasColumn('customers', 'customer_type')) {
+                    $table->string('customer_type', 40)->default('customer')->after('customer_code')->index();
+                }
+                if (!Schema::hasColumn('customers', 'industry')) {
+                    $table->string('industry')->nullable()->after('customer_type');
+                }
+                if (!Schema::hasColumn('customers', 'website')) {
+                    $table->string('website')->nullable()->after('email');
+                }
+                if (!Schema::hasColumn('customers', 'account_manager_id')) {
+                    $table->foreignId('account_manager_id')->nullable()->after('status')->constrained('users')->nullOnDelete();
+                }
+            });
+        }
+
+        if (!Schema::hasTable('customer_sites')) {
+            Schema::create('customer_sites', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
+                $table->string('name');
+                $table->string('site_code', 100)->nullable();
+                $table->string('status', 40)->default('active')->index();
+                $table->text('location');
+                $table->text('notes')->nullable();
+                $table->timestamps();
+            });
+        }
+
+        if (!Schema::hasTable('customer_contacts')) {
+            Schema::create('customer_contacts', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
+                $table->foreignId('customer_site_id')->nullable()->constrained('customer_sites')->nullOnDelete();
+                $table->string('name');
+                $table->string('position')->nullable();
+                $table->string('contact_type', 100)->nullable();
+                $table->string('email')->nullable();
+                $table->string('phone', 100)->nullable();
+                $table->string('mobile', 100)->nullable();
+                $table->boolean('is_primary')->default(false);
+                $table->string('status', 40)->default('active')->index();
+                $table->text('notes')->nullable();
+                $table->timestamps();
+            });
+        }
+
+        if (!Schema::hasTable('customer_interactions')) {
+            Schema::create('customer_interactions', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('customer_id')->constrained('customers')->cascadeOnDelete();
+                $table->foreignId('customer_site_id')->nullable()->constrained('customer_sites')->nullOnDelete();
+                $table->foreignId('customer_contact_id')->nullable()->constrained('customer_contacts')->nullOnDelete();
+                $table->string('type', 40)->default('note');
+                $table->string('subject');
+                $table->text('notes')->nullable();
+                $table->dateTime('occurred_at');
+                $table->dateTime('follow_up_at')->nullable();
+                $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->timestamps();
+                $table->index(['customer_id', 'occurred_at']);
+            });
+        }
+    }
+
+    private function seedV286Permissions(): void
+    {
+        $permissions = [
+            [
+                'slug' => 'customer_sites.manage',
+                'name' => 'Manage Customer Sites',
+                'module' => 'Customers',
+                'description' => 'Add, edit and delete customer sites/locations.',
+            ],
+            [
+                'slug' => 'customer_contacts.manage',
+                'name' => 'Manage Customer Contacts',
+                'module' => 'Customers',
+                'description' => 'Add, edit and delete customer and site contact people.',
+            ],
+            [
+                'slug' => 'customer_interactions.manage',
+                'name' => 'Manage Customer Interactions',
+                'module' => 'Customers',
+                'description' => 'Log, edit and delete customer interactions and follow-ups.',
+            ],
+        ];
+
+        $permissionIds = [];
+        foreach ($permissions as $permissionData) {
+            $permission = Permission::updateOrCreate(
+                ['slug' => $permissionData['slug']],
+                [
+                    'name' => $permissionData['name'],
+                    'module' => $permissionData['module'],
+                    'description' => $permissionData['description'],
+                ]
+            );
+            $permissionIds[] = $permission->id;
+        }
+
+        Role::whereIn('slug', ['system-administrator', 'director', 'manager'])->get()->each(function (Role $role) use ($permissionIds) {
+            $role->permissions()->syncWithoutDetaching($permissionIds);
+        });
+    }
+
+    private function seedV286Version(): void
+    {
+        if (Schema::hasTable('system_settings')) {
+            DB::table('system_settings')->updateOrInsert(
+                ['key' => 'platform_version'],
+                [
+                    'group' => 'Identity',
+                    'label' => 'Platform Version',
+                    'value' => '2.8.6',
+                    'type' => 'text',
+                    'description' => 'Current ISO Admin Command Framework package version.',
+                    'sort_order' => 5,
+                    'is_core' => true,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
+    }
+
 }
