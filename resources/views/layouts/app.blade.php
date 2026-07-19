@@ -89,6 +89,7 @@
             str_starts_with($routeName, 'google_api_settings') => '🗺️',
             str_starts_with($routeName, 'core_settings') => '🔧',
             str_starts_with($routeName, 'leave_types') => '🗓️',
+            str_starts_with($routeName, 'platform_updates') => '⬆️',
             str_starts_with($routeName, 'updates') => '⬆️',
             default => '⌂',
         };
@@ -159,6 +160,9 @@
                     @endif
                     @if($currentUser->hasPermission('leave_types.view') && \Illuminate\Support\Facades\Schema::hasTable('leave_types'))
                         <a href="{{ route('leave_types.index') }}" class="{{ request()->routeIs('leave_types.*') ? 'active' : '' }}"><span class="nav-icon">🗓️</span><span class="nav-text"><strong>Leave Settings</strong><span>Leave types</span></span></a>
+                    @endif
+                    @if($currentUser->hasRole('system-administrator') && $currentUser->hasPermission('platform_updates.view'))
+                        <a href="{{ route('platform_updates.index') }}" class="{{ request()->routeIs('platform_updates.*') ? 'active' : '' }}"><span class="nav-icon">⬆️</span><span class="nav-text"><strong>Update Manager</strong><span>ZIP and GitHub updates</span></span></a>
                     @endif
                 @endif
                 <form class="logout-form" method="post" action="{{ route('logout') }}">@csrf<button type="submit"><span class="nav-icon">↩</span><span class="nav-text"><strong>Logout</strong><span>End session</span></span></button></form>

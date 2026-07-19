@@ -14,6 +14,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\GoogleApiSettingController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveTypeController;
+use App\Http\Controllers\PlatformUpdateController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UpdateController;
@@ -212,6 +213,38 @@ Route::middleware([EnsureInstalled::class])->group(function () {
         Route::post('/updates/v2-6-11', [UpdateController::class, 'applyV2611'])
             ->middleware(CheckPermission::class . ':settings.manage')
             ->name('updates.v2_6_11.apply');
+
+        Route::get('/updates/v2-9-0', [UpdateController::class, 'v290'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_9_0');
+        Route::post('/updates/v2-9-0', [UpdateController::class, 'applyV290'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_9_0.apply');
+
+        Route::get('/settings/updates', [PlatformUpdateController::class, 'index'])
+            ->middleware(CheckPermission::class . ':platform_updates.view')
+            ->name('platform_updates.index');
+        Route::put('/settings/updates/settings', [PlatformUpdateController::class, 'updateSettings'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.settings.update');
+        Route::post('/settings/updates/upload', [PlatformUpdateController::class, 'upload'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.upload');
+        Route::post('/settings/updates/github-download', [PlatformUpdateController::class, 'downloadGithub'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.github.download');
+        Route::post('/settings/updates/apply', [PlatformUpdateController::class, 'apply'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.apply');
+        Route::delete('/settings/updates/packages/{filename}', [PlatformUpdateController::class, 'destroyPackage'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.packages.destroy');
+        Route::get('/settings/updates/backups/{filename}/download', [PlatformUpdateController::class, 'downloadBackup'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.backups.download');
+        Route::delete('/settings/updates/backups/{filename}', [PlatformUpdateController::class, 'destroyBackup'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.backups.destroy');
 
         Route::get('/profile', [ProfileController::class, 'show'])
             ->middleware(CheckPermission::class . ':profile.view')
