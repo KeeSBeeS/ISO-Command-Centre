@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\EmployeeComplianceController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\CronJobController;
@@ -213,6 +214,13 @@ Route::middleware([EnsureInstalled::class])->group(function () {
             ->middleware(CheckPermission::class . ':settings.manage')
             ->name('updates.v2_6_11.apply');
 
+        Route::get('/updates/v2-8-7', [UpdateController::class, 'v287'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_8_7');
+        Route::post('/updates/v2-8-7', [UpdateController::class, 'applyV287'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_8_7.apply');
+
         Route::get('/profile', [ProfileController::class, 'show'])
             ->middleware(CheckPermission::class . ':profile.view')
             ->name('profile.show');
@@ -271,6 +279,10 @@ Route::middleware([EnsureInstalled::class])->group(function () {
         Route::get('/employee-documents/reminders', [EmployeeDocumentController::class, 'reminders'])
             ->middleware(CheckPermission::class . ':employee_documents.view')
             ->name('employee_documents.reminders');
+
+        Route::get('/employee-compliance', [EmployeeComplianceController::class, 'index'])
+            ->middleware(CheckPermission::class . ':employee_compliance.view')
+            ->name('employee_compliance.index');
 
         Route::get('/calendar', [CalendarController::class, 'index'])
             ->middleware(CheckPermission::class . ':calendar.view')

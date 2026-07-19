@@ -152,6 +152,10 @@ class DashboardController extends Controller
             'activeDocumentCount' => $documentsReady ? EmployeeDocument::where('status', 'active')->count() : 0,
             'expiringDocumentCount' => $documentsReady ? EmployeeDocument::reminderDue()->count() : 0,
             'expiredDocumentCount' => $documentsReady ? EmployeeDocument::where('status', 'active')->where('has_expiry', true)->whereDate('expires_at', '<', now()->toDateString())->count() : 0,
+            'complianceMissingDocumentsCount' => $documentsReady ? User::where('status', 'active')->whereDoesntHave('documents')->count() : 0,
+            'complianceNonCompliantCount' => $documentsReady ? User::where('status', 'active')->whereHas('documents', function ($query) {
+                $query->where('status', 'active')->where('has_expiry', true)->whereDate('expires_at', '<', now()->toDateString());
+            })->count() : 0,
             'vehiclesReady' => $vehiclesReady,
             'vehicleCount' => $vehiclesReady ? Vehicle::count() : 0,
             'activeVehicleCount' => $vehiclesReady ? Vehicle::where('status', 'active')->count() : 0,
@@ -211,6 +215,14 @@ class DashboardController extends Controller
                 'default_size' => 'medium',
                 'default_order' => 40,
                 'available' => $metrics['documentsReady'] && $user->hasPermission('employee_documents.view'),
+            ],
+            [
+                'key' => 'employee_compliance',
+                'title' => 'Employee Compliance',
+                'description' => 'Active employee document compliance overview.',
+                'default_size' => 'medium',
+                'default_order' => 45,
+                'available' => $metrics['documentsReady'] && $user->hasPermission('employee_compliance.view'),
             ],
             [
                 'key' => 'vehicles',

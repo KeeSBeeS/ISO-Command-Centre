@@ -9,6 +9,7 @@
         'leave_calendar' => ['icon' => '🗓️', 'kicker' => 'Leave', 'title' => 'Leave & Calendar'],
         'attendance_today' => ['icon' => '⏱️', 'kicker' => 'Attendance', 'title' => 'Today Attendance'],
         'employee_documents' => ['icon' => '📄', 'kicker' => 'Documents', 'title' => 'Employee Documents'],
+        'employee_compliance' => ['icon' => '✅', 'kicker' => 'Compliance', 'title' => 'Employee Compliance'],
         'vehicles' => ['icon' => '🚗', 'kicker' => 'Fleet', 'title' => 'Vehicles'],
         'fuel_this_month' => ['icon' => '⛽', 'kicker' => 'Fuel', 'title' => 'Fuel This Month'],
         'vehicle_reminders' => ['icon' => '📎', 'kicker' => 'Vehicle Docs', 'title' => 'Vehicle Reminders'],
@@ -115,6 +116,13 @@
                 <div class="mini-metric">{{ $expiringDocumentCount }}</div>
                 <p class="muted">Reminder due</p>
                 <div class="widget-detail hide-small"><div class="metric-row"><div class="metric-box"><span>Active</span><strong>{{ $activeDocumentCount }}</strong></div><div class="metric-box"><span>Reminder Due</span><strong>{{ $expiringDocumentCount }}</strong></div><div class="metric-box"><span>Expired</span><strong>{{ $expiredDocumentCount }}</strong></div><div class="metric-box"><span>Centre</span><strong style="font-size:16px"><a href="{{ route('employee_documents.reminders') }}">Open</a></strong></div></div></div>
+                @break
+
+            @case('employee_compliance')
+                <div class="widget-title"><div class="widget-title-left"><div class="widget-icon">{{ $meta['icon'] }}</div><div><div class="widget-kicker">{{ $meta['kicker'] }}</div><h2>{{ $meta['title'] }}</h2></div></div><span class="pill">{{ ucfirst($widget['size']) }}</span></div>
+                <div class="mini-metric">{{ $activeEmployeeCount - $complianceMissingDocumentsCount - $complianceNonCompliantCount }}</div>
+                <p class="muted">Compliant employees</p>
+                <div class="widget-detail hide-small"><div class="metric-row"><div class="metric-box"><span>Active Employees</span><strong>{{ $activeEmployeeCount }}</strong></div><div class="metric-box"><span>Compliant</span><strong>{{ $activeEmployeeCount - $complianceMissingDocumentsCount - $complianceNonCompliantCount }}</strong></div><div class="metric-box"><span>Missing Docs</span><strong>{{ $complianceMissingDocumentsCount }}</strong></div><div class="metric-box"><span>Overview</span><strong style="font-size:16px"><a href="{{ route('employee_compliance.index') }}">Open</a></strong></div></div></div>
                 @break
 
             @case('vehicles')

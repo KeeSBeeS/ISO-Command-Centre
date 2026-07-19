@@ -31,6 +31,7 @@
                     'quick_actions' => '⚡',
                     'attendance_today' => '⏱️',
                     'employee_documents' => '📄',
+                    'employee_compliance' => '✅',
                     'vehicles' => '🚗',
                     'fuel_this_month' => '⛽',
                     'vehicle_reminders' => '📎',

@@ -142,6 +142,9 @@
                 @if($currentUser->hasPermission('employee_documents.view') && \Illuminate\Support\Facades\Schema::hasTable('employee_documents'))
                     <a href="{{ route('employee_documents.reminders') }}" class="{{ request()->routeIs('employee_documents.*') ? 'active' : '' }}"><span class="nav-icon">📄</span><span class="nav-text"><strong>Document Reminders</strong><span>Expiring records</span></span></a>
                 @endif
+                @if($currentUser->hasPermission('employee_compliance.view') && \Illuminate\Support\Facades\Schema::hasTable('employee_documents'))
+                    <a href="{{ route('employee_compliance.index') }}" class="{{ request()->routeIs('employee_compliance.*') ? 'active' : '' }}"><span class="nav-icon">✅</span><span class="nav-text"><strong>Compliance Overview</strong><span>Employee document compliance</span></span></a>
+                @endif
 
                 <div class="nav-section-label">Admin</div>
                 @if($currentUser->hasPermission('cron_jobs.view'))

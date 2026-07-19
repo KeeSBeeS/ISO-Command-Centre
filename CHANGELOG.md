@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.8.7
+
+Employee Compliance Overview (fixes broken dashboard link).
+
+- Fixed `Route [employee_compliance.index] not defined` thrown by the Dashboard's "Compliance Overview" widget. That widget referenced a v2.8.0 "Employee Compliance Management" feature that was only ever documented (README + CHANGELOG entry) and never actually implemented — no controller, route, view or permission existed for it anywhere in history.
+- Added a real `employee_compliance.index` page backed by existing employee document data (no new tables): active employee count, compliant count, employees with no documents on file, and documents needing attention (expired + reminder-due), plus a per-employee breakdown.
+- Added a matching Dashboard widget and sidebar link.
+- Added the `employee_compliance.view` permission (Director and Manager by default). Existing installs need to run `/updates/v2-8-7` once to seed it.
+- Did not rebuild the full v2.8.0 Phase 1-3 scope (document-type matrix, approval workflow, policy versioning, medical/licence compliance) — that was never actually built and is a separate, much larger feature if still wanted.
+
 ## v2.8.6
 
 Employee documents redesign.
