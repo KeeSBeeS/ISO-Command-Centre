@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.9.0
+
+Update Manager: web-based platform updates via ZIP upload or GitHub.
+
+- Added the Update Manager under the Admin menu (`/settings/updates`), System Administrator only.
+- Added platform update via uploaded deployment ZIP (full or partial changed-files packages).
+- Added platform update via GitHub: configurable repository, branch and optional access token for private repositories.
+- Added automatic pre-apply code backup ZIPs with download, delete and re-apply support.
+- Applies never overwrite `.env`, `storage/`, `node_modules/` or the local database file; unsafe ZIP paths are rejected and compiled caches are cleared after applying.
+- Added permissions `platform_updates.view` and `platform_updates.manage`.
+- Added Update Manager settings group in System Settings.
+- System Administrator permissions are re-synced.
+
 ## v2.8.0 Foreign Key Hotfix
 
 - Fixed MySQL error `1059 Identifier name is too long` during the v2.8.0 update.
