@@ -6,6 +6,7 @@ use App\Models\AttendanceDay;
 use App\Models\AttendanceImport;
 use App\Models\AttendanceRawRecord;
 use App\Models\PublicHoliday;
+use App\Models\SystemSetting;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
@@ -59,6 +60,8 @@ class AttendanceCsvImporter
                 'status' => $result['failed'] ? 'failed' : 'completed',
                 'notes' => $result['notes'],
             ]);
+
+            $this->pruneHistory();
 
             return $import;
         });
@@ -343,6 +346,13 @@ class AttendanceCsvImporter
         if (Schema::hasColumn('attendance_days', 'is_public_holiday')) {
             $payload['is_public_holiday'] = $isPublicHoliday;
             $payload['public_holiday_name'] = $publicHoliday?->name;
+        }
+        if (Schema::hasColumn('attendance_days', 'is_early_leave')) {
+            $payload['is_early_leave'] = false;
+            $payload['early_leave_minutes'] = 0;
+        }
+        if (Schema::hasColumn('attendance_days', 'is_weekend')) {
+            $payload['is_weekend'] = Carbon::parse($date)->isWeekend();
         }
 
         AttendanceDay::updateOrCreate(
@@ -715,57 +725,64 @@ class AttendanceCsvImporter
             return;
         }
 
-        $cutoff = Carbon::parse($date . ' 09:00:00');
+        $day = Carbon::parse($date);
         $publicHoliday = $this->publicHolidayFor($date);
         $isPublicHoliday = (bool) $publicHoliday;
+        $isWeekend = $day->isWeekend();
+        $isWorkday = !$isPublicHoliday && !$isWeekend;
 
-        $recordsBeforeCutoff = $records->filter(function (AttendanceRawRecord $record) use ($cutoff) {
-            return $record->recorded_at && $record->recorded_at->lte($cutoff);
-        })->values();
+        $timing = $this->companyTiming();
+        $scheduledStart = Carbon::parse($date . ' ' . $timing['start'] . ':00');
+        $scheduledClose = Carbon::parse($date . ' ' . $timing['close'] . ':00');
 
-        // Clock-in is only accepted until 09:00. If there are multiple records before 09:00,
-        // only the earliest one becomes the clock-in. If none exist before 09:00, the earliest
-        // available record becomes the late clock-in and the day is flagged.
-        $first = $recordsBeforeCutoff->isNotEmpty() ? $recordsBeforeCutoff->first() : $records->first();
+        // The earliest punch of the day is the check-in and the latest punch is the checkout.
+        $first = $records->first();
         $last = $records->last();
 
         $endTime = null;
         $minutes = 0;
         if ($first->recorded_at && $last->recorded_at && !$first->recorded_at->equalTo($last->recorded_at)) {
             $endTime = $last->recorded_at;
-            $minutes = max(0, $first->recorded_at->diffInMinutes($last->recorded_at, false));
+            $minutes = max(0, (int) $first->recorded_at->diffInMinutes($last->recorded_at, false));
         }
 
         $isLate = false;
         $lateMinutes = 0;
-        if (!$isPublicHoliday && $first->recorded_at && $first->recorded_at->gt($cutoff)) {
+        if ($isWorkday && $first->recorded_at && $first->recorded_at->gt($scheduledStart)) {
             $isLate = true;
-            $lateMinutes = max(1, $cutoff->diffInMinutes($first->recorded_at, false));
+            $lateMinutes = max(1, (int) $scheduledStart->diffInMinutes($first->recorded_at, false));
         }
 
-        if ($isPublicHoliday) {
-            // The company is closed on public holidays. Keep the raw record for audit, but do
-            // not count it as a normal working day or late clock-in.
+        $isEarlyLeave = false;
+        $earlyLeaveMinutes = 0;
+        if ($isWorkday && $endTime && $endTime->lt($scheduledClose)) {
+            $isEarlyLeave = true;
+            $earlyLeaveMinutes = max(1, (int) $endTime->diffInMinutes($scheduledClose, false));
+        }
+
+        if (!$isWorkday) {
+            // The company is closed on weekends and public holidays. Keep the raw records for
+            // audit, but do not count the day as a normal working day, late arrival or early leave.
             $minutes = 0;
-            $isLate = false;
-            $lateMinutes = 0;
         }
 
         $anomalies = [];
         if ($isPublicHoliday) {
             $anomalies[] = 'Public holiday / company closed: ' . $publicHoliday->name . '. Attendance is retained for audit only.';
-        }
-        if ($recordsBeforeCutoff->count() > 1) {
-            $anomalies[] = 'Multiple clock-ins before 09:00; earliest time kept as check-in.';
+        } elseif ($isWeekend) {
+            $anomalies[] = 'Weekend: the company is closed. Attendance is retained for audit only.';
         }
         if ($records->count() === 1) {
             $anomalies[] = 'Only one attendance record found for this day; checkout could not be calculated.';
         }
-        if ($first->recorded_at && $last->recorded_at && $first->recorded_at->equalTo($last->recorded_at)) {
+        if ($records->count() > 1 && $first->recorded_at && $last->recorded_at && $first->recorded_at->equalTo($last->recorded_at)) {
             $anomalies[] = 'Clock-in and checkout time were the same; checkout was left blank.';
         }
         if ($isLate) {
-            $anomalies[] = 'Late clock-in after 09:00.';
+            $anomalies[] = 'Late check-in after ' . $timing['start'] . '.';
+        }
+        if ($isEarlyLeave) {
+            $anomalies[] = 'Checkout before office close time of ' . $timing['close'] . '.';
         }
 
         $payload = [
@@ -788,11 +805,56 @@ class AttendanceCsvImporter
             $payload['is_public_holiday'] = $isPublicHoliday;
             $payload['public_holiday_name'] = $publicHoliday?->name;
         }
+        if (Schema::hasColumn('attendance_days', 'is_early_leave')) {
+            $payload['is_early_leave'] = $isEarlyLeave;
+            $payload['early_leave_minutes'] = $earlyLeaveMinutes;
+        }
+        if (Schema::hasColumn('attendance_days', 'is_weekend')) {
+            $payload['is_weekend'] = $isWeekend;
+        }
 
         AttendanceDay::updateOrCreate(
             ['user_id' => $userId, 'attendance_date' => $date],
             $payload
         );
+    }
+
+    private function companyTiming(): array
+    {
+        return [
+            'start' => $this->normaliseTimingValue(SystemSetting::valueFor('attendance_company_start_time', '06:00'), '06:00'),
+            'close' => $this->normaliseTimingValue(SystemSetting::valueFor('attendance_company_close_time', '15:00'), '15:00'),
+        ];
+    }
+
+    private function normaliseTimingValue(mixed $value, string $default): string
+    {
+        $value = trim((string) $value);
+
+        return preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $value) ? $value : $default;
+    }
+
+    /**
+     * Remove attendance history older than the configured retention window. Retention is
+     * configured in months via the attendance_history_retention_months system setting.
+     * 0 (the default) keeps history forever; any configured value below 12 months is
+     * raised to 12 so at least a full year of history is always available.
+     */
+    public function pruneHistory(): int
+    {
+        $months = (int) SystemSetting::valueFor('attendance_history_retention_months', 0);
+
+        if ($months <= 0) {
+            return 0;
+        }
+
+        $months = max(12, $months);
+        $cutoff = now()->subMonths($months)->toDateString();
+
+        $removed = AttendanceRawRecord::query()->whereDate('attendance_date', '<', $cutoff)->delete();
+        AttendanceDay::query()->whereDate('attendance_date', '<', $cutoff)->delete();
+
+        return $removed;
     }
 
     private function publicHolidayFor(string $date): ?PublicHoliday

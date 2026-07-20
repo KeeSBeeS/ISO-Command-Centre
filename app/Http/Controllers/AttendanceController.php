@@ -9,6 +9,10 @@ use App\Models\SystemSetting;
 use App\Models\User;
 use App\Services\AttendanceCsvImporter;
 use App\Services\AttendanceMailboxImporter;
+use App\Services\AttendanceOverviewService;
+use App\Services\LeaveBalanceService;
+use App\Services\SickLeaveCycleService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
@@ -16,99 +20,85 @@ use Illuminate\Support\Facades\Schema;
 
 class AttendanceController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, AttendanceOverviewService $overview)
     {
         if (!$this->attendanceInstalled()) {
             return redirect()->route('updates.v1_1')->withErrors(['attendance' => 'Apply Version 1.1 before using attendance.']);
         }
 
-        $timing = $this->attendanceTiming();
-        $selectedEmployee = $request->filled('employee_id')
-            ? User::query()->find($request->integer('employee_id'))
-            : null;
-
-        $latestAttendanceDate = AttendanceDay::query()->max('attendance_date');
-        $employeeMinDate = $selectedEmployee
-            ? AttendanceDay::query()->where('user_id', $selectedEmployee->id)->min('attendance_date')
-            : null;
-        $employeeMaxDate = $selectedEmployee
-            ? AttendanceDay::query()->where('user_id', $selectedEmployee->id)->max('attendance_date')
-            : null;
-
-        $hasExplicitFilter = $request->filled('date_from')
-            || $request->filled('date_to')
-            || $request->filled('search')
-            || $request->boolean('late_only')
-            || $request->boolean('public_holidays_only')
-            || ($request->filled('employee_id') && !$selectedEmployee);
-
-        if ($selectedEmployee && !$request->filled('date_from') && !$request->filled('date_to')) {
-            $dateFrom = $employeeMinDate ?: ($latestAttendanceDate ?: now()->toDateString());
-            $dateTo = $employeeMaxDate ?: $dateFrom;
-        } else {
-            $dateFrom = $request->input('date_from', $hasExplicitFilter ? now()->toDateString() : ($latestAttendanceDate ?: now()->toDateString()));
-            $dateTo = $request->input('date_to', $dateFrom);
+        if ($request->filled('employee_id')) {
+            $selectedEmployee = User::query()->find($request->integer('employee_id'));
+            if ($selectedEmployee) {
+                return redirect()->route('attendance.show', $this->attendanceEmployeeRouteValue($selectedEmployee));
+            }
         }
 
-        $baseQuery = AttendanceDay::query()
+        $timing = $this->attendanceTiming();
+        $latestAttendanceDate = AttendanceDay::query()->max('attendance_date');
+        $anchor = $latestAttendanceDate ? Carbon::parse($latestAttendanceDate) : now();
+
+        $dateFrom = $request->input('date_from') ?: $anchor->copy()->startOfMonth()->toDateString();
+        $dateTo = $request->input('date_to') ?: $anchor->toDateString();
+        if ($dateFrom > $dateTo) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+        }
+
+        $viewMode = $request->input('view') === 'daily' ? 'daily' : 'overview';
+        $search = $request->filled('search') ? (string) $request->string('search') : null;
+
+        $overviewRows = $overview->overview($dateFrom, $dateTo, $search);
+        $totals = $overview->totals($overviewRows);
+
+        $days = AttendanceDay::query()
             ->with(['user.roles', 'user.departments'])
-            ->whereBetween('attendance_date', [$dateFrom, $dateTo])
-            ->when($selectedEmployee, fn ($query) => $query->where('user_id', $selectedEmployee->id))
-            ->when($request->filled('search'), function ($query) use ($request) {
-                $search = $request->string('search');
+            ->whereDate('attendance_date', '>=', $dateFrom)
+            ->whereDate('attendance_date', '<=', $dateTo)
+            ->when($search, function ($query) use ($search) {
                 $query->whereHas('user', function ($userQuery) use ($search) {
                     $userQuery->where('name', 'like', "%{$search}%")
                         ->orWhere('attendance_name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%");
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('employee_code', 'like', "%{$search}%");
                 });
-            });
-
-        $days = (clone $baseQuery)
+            })
             ->when($request->boolean('late_only') && Schema::hasColumn('attendance_days', 'is_late'), function ($query) {
                 $query->where('is_late', true);
+            })
+            ->when($request->boolean('early_only') && Schema::hasColumn('attendance_days', 'is_early_leave'), function ($query) {
+                $query->where('is_early_leave', true);
+            })
+            ->when($request->boolean('missing_only'), function ($query) {
+                $query->whereNotNull('start_time')->whereNull('end_time');
             })
             ->when($request->boolean('public_holidays_only') && Schema::hasColumn('attendance_days', 'is_public_holiday'), function ($query) {
                 $query->where('is_public_holiday', true);
             })
             ->orderByDesc('attendance_date')
             ->orderBy('start_time')
-            ->paginate(30)
+            ->paginate(31)
             ->withQueryString();
 
-        $summaryQuery = clone $baseQuery;
-        $lateQuery = clone $baseQuery;
-        $holidayQuery = clone $baseQuery;
-
-        $workingDayScope = function ($query) {
-            if (Schema::hasColumn('attendance_days', 'is_public_holiday')) {
-                $query->where(function ($nested) {
-                    $nested->where('is_public_holiday', false)->orWhereNull('is_public_holiday');
-                });
-            }
-        };
+        $anchorMonth = Carbon::parse($dateFrom)->startOfMonth();
 
         return view('attendance.index', [
+            'viewMode' => $viewMode,
+            'overviewRows' => $overviewRows,
+            'totals' => $totals,
             'days' => $days,
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
+            'search' => $search,
             'latestAttendanceDate' => $latestAttendanceDate,
-            'presentCount' => (clone $summaryQuery)->whereNotNull('start_time')->where($workingDayScope)->distinct('user_id')->count('user_id'),
-            'absentCount' => (clone $summaryQuery)->whereNull('start_time')->where($workingDayScope)->count(),
-            'recordCount' => (clone $summaryQuery)->sum('record_count'),
-            'singleRecordCount' => (clone $summaryQuery)->where('record_count', '<=', 1)->count(),
-            'lateClockInCount' => Schema::hasColumn('attendance_days', 'is_late') ? $lateQuery->where('is_late', true)->count() : 0,
-            'publicHolidayAttendanceCount' => Schema::hasColumn('attendance_days', 'is_public_holiday') ? $holidayQuery->where('is_public_holiday', true)->count() : 0,
             'latestImport' => AttendanceImport::latest()->first(),
             'attendanceStartTime' => $timing['start'],
             'attendanceCloseTime' => $timing['close'],
-            'selectedEmployee' => $selectedEmployee,
-            'employeeAttendanceSummary' => $selectedEmployee
-                ? $this->employeeAttendanceSummary($selectedEmployee->id, $dateFrom, $dateTo, $timing['start_minutes'], $timing['close_minutes'])
-                : null,
+            'previousMonth' => $anchorMonth->copy()->subMonth(),
+            'nextMonth' => $anchorMonth->copy()->addMonth(),
+            'periodLabel' => Carbon::parse($dateFrom)->format('j M Y') . ' – ' . Carbon::parse($dateTo)->format('j M Y'),
         ]);
     }
 
-    public function show(Request $request, string $attendanceDay)
+    public function show(Request $request, string $attendanceDay, AttendanceOverviewService $overview, SickLeaveCycleService $sickCycle, LeaveBalanceService $leaveBalance)
     {
         if (!$this->attendanceInstalled()) {
             return redirect()->route('updates.v1_1');
@@ -151,19 +141,9 @@ class AttendanceController extends Controller
                 });
             });
 
-        $dayBase = AttendanceDay::query()
-            ->where('user_id', $employee->id)
-            ->when($dateFrom, fn ($query) => $query->whereDate('attendance_date', '>=', $dateFrom))
-            ->when($dateTo, fn ($query) => $query->whereDate('attendance_date', '<=', $dateTo));
-
         $rawRecords = (clone $rawBase)
             ->orderByDesc('recorded_at')
             ->paginate(100, ['*'], 'records_page')
-            ->withQueryString();
-
-        $dailySummaries = (clone $dayBase)
-            ->orderByDesc('attendance_date')
-            ->paginate(31, ['*'], 'days_page')
             ->withQueryString();
 
         $punchHistory = (clone $rawBase)
@@ -196,23 +176,26 @@ class AttendanceController extends Controller
             ->limit(10)
             ->get();
 
-        $lateSummary = ($activeDateFrom && $activeDateTo)
-            ? $this->employeeAttendanceSummary($employee->id, $activeDateFrom, $activeDateTo, $timing['start_minutes'], $timing['close_minutes'])
-            : [
-                'days' => (clone $dayBase)->count(),
-                'late_days' => 0,
-                'late_minutes' => 0,
-                'late_label' => '0 min',
-                'early_leave_days' => 0,
-                'early_leave_minutes' => 0,
-                'early_leave_label' => '0 min',
-            ];
+        $dayLog = ($activeDateFrom && $activeDateTo)
+            ? $overview->dayLog($employee, $activeDateFrom, $activeDateTo)
+            : collect();
+
+        $periodSummary = $this->summariseDayLog($dayLog);
+        $monthlyTrend = $overview->monthlyTrend($employee, 12);
+
+        $sickCycleSummary = null;
+        if (Schema::hasTable('employee_sick_records') || Schema::hasTable('leave_requests')) {
+            $sickCycleSummary = $sickCycle->cycleFor($employee);
+        }
+
+        $leaveSummary = Schema::hasTable('employee_leave_allocations')
+            ? $leaveBalance->summary($employee)
+            : null;
 
         return view('attendance.show', [
             'employee' => $employee,
             'employeeCode' => $this->attendanceEmployeeRouteValue($employee),
             'rawRecords' => $rawRecords,
-            'dailySummaries' => $dailySummaries,
             'punchHistory' => $punchHistory,
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
@@ -231,8 +214,68 @@ class AttendanceController extends Controller
             ],
             'statusBreakdown' => $statusBreakdown,
             'imports' => $imports,
-            'lateSummary' => $lateSummary,
+            'dayLog' => $dayLog->take(180),
+            'dayLogTotal' => $dayLog->count(),
+            'periodSummary' => $periodSummary,
+            'monthlyTrend' => $monthlyTrend,
+            'sickCycleSummary' => $sickCycleSummary,
+            'leaveSummary' => $leaveSummary,
         ]);
+    }
+
+    private function summariseDayLog(\Illuminate\Support\Collection $dayLog): array
+    {
+        $present = 0;
+        $late = 0;
+        $lateMinutes = 0;
+        $early = 0;
+        $earlyMinutes = 0;
+        $missing = 0;
+        $absent = 0;
+        $onLeave = 0;
+
+        foreach ($dayLog as $entry) {
+            $day = $entry['day'];
+
+            if (!$entry['is_workday']) {
+                continue;
+            }
+
+            if ($day && $day->start_time) {
+                $present++;
+                if ($day->is_late) {
+                    $late++;
+                    $lateMinutes += (int) $day->late_minutes;
+                }
+                if ($day->is_early_leave ?? false) {
+                    $early++;
+                    $earlyMinutes += (int) $day->early_leave_minutes;
+                }
+                if (!$day->end_time) {
+                    $missing++;
+                }
+                continue;
+            }
+
+            if ($entry['leave_label']) {
+                $onLeave++;
+            } else {
+                $absent++;
+            }
+        }
+
+        return [
+            'present_days' => $present,
+            'late_days' => $late,
+            'late_minutes' => $lateMinutes,
+            'late_label' => $this->formatMinutes($lateMinutes),
+            'early_leave_days' => $early,
+            'early_leave_minutes' => $earlyMinutes,
+            'early_leave_label' => $this->formatMinutes($earlyMinutes),
+            'missing_checkout_days' => $missing,
+            'absent_days' => $absent,
+            'on_leave_days' => $onLeave,
+        ];
     }
 
     public function upload()
@@ -338,50 +381,6 @@ class AttendanceController extends Controller
         return view('attendance.imports', [
             'imports' => AttendanceImport::with('importer')->latest()->paginate(25),
         ]);
-    }
-
-    private function employeeAttendanceSummary(int $userId, string $dateFrom, string $dateTo, int $startMinutes, int $closeMinutes): array
-    {
-        $days = AttendanceDay::query()
-            ->where('user_id', $userId)
-            ->whereBetween('attendance_date', [$dateFrom, $dateTo])
-            ->when(Schema::hasColumn('attendance_days', 'is_public_holiday'), function ($query) {
-                $query->where(function ($nested) {
-                    $nested->where('is_public_holiday', false)->orWhereNull('is_public_holiday');
-                });
-            })
-            ->orderBy('attendance_date')
-            ->get();
-
-        $lateMinutes = 0;
-        $earlyLeaveMinutes = 0;
-        $lateDays = 0;
-        $earlyLeaveDays = 0;
-
-        foreach ($days as $day) {
-            $start = $day->start_time ? ((int) $day->start_time->format('H') * 60 + (int) $day->start_time->format('i')) : null;
-            $end = $day->end_time ? ((int) $day->end_time->format('H') * 60 + (int) $day->end_time->format('i')) : null;
-
-            if ($start !== null && $start > $startMinutes) {
-                $lateDays++;
-                $lateMinutes += $start - $startMinutes;
-            }
-
-            if ($end !== null && $end < $closeMinutes) {
-                $earlyLeaveDays++;
-                $earlyLeaveMinutes += $closeMinutes - $end;
-            }
-        }
-
-        return [
-            'days' => $days->count(),
-            'late_days' => $lateDays,
-            'late_minutes' => $lateMinutes,
-            'late_label' => $this->formatMinutes($lateMinutes),
-            'early_leave_days' => $earlyLeaveDays,
-            'early_leave_minutes' => $earlyLeaveMinutes,
-            'early_leave_label' => $this->formatMinutes($earlyLeaveMinutes),
-        ];
     }
 
     private function attendanceTiming(): array

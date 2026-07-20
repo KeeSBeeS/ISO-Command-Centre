@@ -12,8 +12,10 @@ use App\Http\Controllers\CronJobController;
 use App\Http\Controllers\CoreSettingController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\GoogleApiSettingController;
+use App\Http\Controllers\LeaveAllocationController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveTypeController;
+use App\Http\Controllers\SickLeaveController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UpdateController;
@@ -213,6 +215,13 @@ Route::middleware([EnsureInstalled::class])->group(function () {
             ->middleware(CheckPermission::class . ':settings.manage')
             ->name('updates.v2_6_11.apply');
 
+        Route::get('/updates/v2-9-0', [UpdateController::class, 'v290'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_9_0');
+        Route::post('/updates/v2-9-0', [UpdateController::class, 'applyV290'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_9_0.apply');
+
         Route::get('/profile', [ProfileController::class, 'show'])
             ->middleware(CheckPermission::class . ':profile.view')
             ->name('profile.show');
@@ -285,6 +294,21 @@ Route::middleware([EnsureInstalled::class])->group(function () {
         Route::post('/leave', [LeaveRequestController::class, 'store'])
             ->middleware(CheckPermission::class . ':leave.create')
             ->name('leave.store');
+        Route::get('/leave/allocations', [LeaveAllocationController::class, 'index'])
+            ->middleware(CheckPermission::class . ':leave_allocations.view')
+            ->name('leave_allocations.index');
+        Route::post('/leave/allocations', [LeaveAllocationController::class, 'store'])
+            ->middleware(CheckPermission::class . ':leave_allocations.manage')
+            ->name('leave_allocations.store');
+        Route::get('/leave/sick', [SickLeaveController::class, 'index'])
+            ->middleware(CheckPermission::class . ':sick_leave.view')
+            ->name('sick_leave.index');
+        Route::post('/leave/sick', [SickLeaveController::class, 'store'])
+            ->middleware(CheckPermission::class . ':sick_leave.manage')
+            ->name('sick_leave.store');
+        Route::post('/leave/sick/{sickRecord}/remove', [SickLeaveController::class, 'remove'])
+            ->middleware(CheckPermission::class . ':sick_leave.manage')
+            ->name('sick_leave.remove');
         Route::get('/leave/{leaveRequest}', [LeaveRequestController::class, 'show'])
             ->middleware(CheckPermission::class . ':leave.view')
             ->name('leave.show');

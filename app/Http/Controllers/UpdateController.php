@@ -2059,4 +2059,221 @@ class UpdateController extends Controller
         }
     }
 
+    public function v290()
+    {
+        $systemVersion = Schema::hasTable('system_settings')
+            ? DB::table('system_settings')->where('key', 'platform_version')->value('value')
+            : null;
+        $attendanceInstalled = Schema::hasTable('attendance_days') && Schema::hasTable('attendance_imports') && Schema::hasTable('attendance_raw_records');
+        $attendanceColumnsInstalled = $attendanceInstalled
+            && Schema::hasColumn('attendance_days', 'is_early_leave')
+            && Schema::hasColumn('attendance_days', 'is_weekend');
+        $allocationsInstalled = Schema::hasTable('employee_leave_allocations');
+        $sickRecordsInstalled = Schema::hasTable('employee_sick_records');
+        $attendanceDayCount = $attendanceInstalled ? DB::table('attendance_days')->count() : 0;
+
+        return view('updates.v2_9_0', compact(
+            'systemVersion',
+            'attendanceInstalled',
+            'attendanceColumnsInstalled',
+            'allocationsInstalled',
+            'sickRecordsInstalled',
+            'attendanceDayCount'
+        ));
+    }
+
+    public function applyV290(Request $request)
+    {
+        $this->addAttendanceTables();
+        $this->addV262AttendanceColumns();
+        $this->addV262PublicHolidayTable();
+        $this->seedV262PublicHolidays();
+        $this->addV290AttendanceColumns();
+        $this->addV290LeaveManagementTables();
+        $this->seedAttendancePermissions();
+        $this->seedManualAttendanceUploadPermission();
+        $this->seedV290Permissions();
+        $this->seedV290Settings();
+        $this->seedV290Version();
+
+        $rebuilt = 0;
+        if (Schema::hasTable('attendance_raw_records')) {
+            $rebuilt = app(\App\Services\AttendanceCsvImporter::class)->rebuildAllExistingDays();
+        }
+
+        $this->seedSystemAdministratorAllPermissions($request->user());
+
+        return redirect()->route('updates.v2_9_0')->with('success', 'Version 2.9.0 applied. Attendance redesign is active (first punch = check-in, last punch = checkout, weekend and early-leave detection), leave allocations and the 36-month sick leave cycle tracker are installed, and ' . $rebuilt . ' attendance day(s) were rebuilt with the new rules.');
+    }
+
+    private function addV290AttendanceColumns(): void
+    {
+        if (!Schema::hasTable('attendance_days')) {
+            return;
+        }
+
+        if (!Schema::hasColumn('attendance_days', 'is_early_leave')) {
+            Schema::table('attendance_days', function (Blueprint $table) {
+                $table->boolean('is_early_leave')->default(false)->index()->after('late_minutes');
+            });
+        }
+
+        if (!Schema::hasColumn('attendance_days', 'early_leave_minutes')) {
+            Schema::table('attendance_days', function (Blueprint $table) {
+                $table->unsignedInteger('early_leave_minutes')->default(0)->after('is_early_leave');
+            });
+        }
+
+        if (!Schema::hasColumn('attendance_days', 'is_weekend')) {
+            Schema::table('attendance_days', function (Blueprint $table) {
+                $table->boolean('is_weekend')->default(false)->index()->after('early_leave_minutes');
+            });
+        }
+    }
+
+    private function addV290LeaveManagementTables(): void
+    {
+        if (!Schema::hasTable('employee_leave_allocations')) {
+            Schema::create('employee_leave_allocations', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+                $table->unsignedSmallInteger('year')->index();
+                $table->decimal('allocated_days', 6, 2)->default(0);
+                $table->decimal('carried_over_days', 6, 2)->default(0);
+                $table->text('notes')->nullable();
+                $table->foreignId('allocated_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->timestamps();
+                $table->unique(['user_id', 'year']);
+            });
+        }
+
+        if (!Schema::hasTable('employee_sick_records')) {
+            Schema::create('employee_sick_records', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+                $table->foreignId('marked_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->date('sick_from')->index();
+                $table->date('sick_to')->index();
+                $table->string('leave_type')->default('sick')->index();
+                $table->string('status')->default('active')->index();
+                $table->boolean('sick_note_required')->default(false);
+                $table->boolean('leave_form_required')->default(false);
+                $table->text('notes')->nullable();
+                $table->dateTime('cleared_at')->nullable();
+                $table->string('converted_from_type')->nullable();
+                $table->foreignId('converted_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->dateTime('converted_at')->nullable();
+                $table->date('original_to')->nullable();
+                $table->foreignId('extended_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->dateTime('extended_at')->nullable();
+                $table->text('removal_reason')->nullable();
+                $table->dateTime('removed_at')->nullable();
+                $table->foreignId('removed_by')->nullable()->constrained('users')->nullOnDelete();
+                $table->timestamps();
+                $table->index(['user_id', 'sick_from', 'sick_to']);
+            });
+        }
+    }
+
+    private function seedV290Permissions(): void
+    {
+        $permissions = [
+            ['name' => 'View Leave Allocations', 'slug' => 'leave_allocations.view', 'module' => 'Leave', 'description' => 'View annual paid leave allocations and balances per employee.'],
+            ['name' => 'Manage Leave Allocations', 'slug' => 'leave_allocations.manage', 'module' => 'Leave', 'description' => 'Directors decide how many paid leave days each employee gets per year.'],
+            ['name' => 'View Sick Leave Register', 'slug' => 'sick_leave.view', 'module' => 'Leave', 'description' => 'View the sick leave register and 36-month cycle balances.'],
+            ['name' => 'Manage Sick Leave Register', 'slug' => 'sick_leave.manage', 'module' => 'Leave', 'description' => 'Record and remove sick leave entries in the register.'],
+        ];
+
+        foreach ($permissions as $permission) {
+            Permission::firstOrCreate(['slug' => $permission['slug']], $permission);
+        }
+
+        $directorIds = Permission::whereIn('slug', [
+            'leave_allocations.view',
+            'leave_allocations.manage',
+            'sick_leave.view',
+            'sick_leave.manage',
+        ])->pluck('id')->all();
+        $managerIds = Permission::whereIn('slug', [
+            'leave_allocations.view',
+            'sick_leave.view',
+            'sick_leave.manage',
+        ])->pluck('id')->all();
+
+        if ($director = Role::where('slug', 'director')->first()) {
+            $director->permissions()->syncWithoutDetaching($directorIds);
+        }
+        if ($manager = Role::where('slug', 'manager')->first()) {
+            $manager->permissions()->syncWithoutDetaching($managerIds);
+        }
+    }
+
+    private function seedV290Settings(): void
+    {
+        if (!Schema::hasTable('system_settings')) {
+            return;
+        }
+
+        $settings = [
+            [
+                'key' => 'sick_leave_cycle_months',
+                'group' => 'Attendance',
+                'label' => 'Sick Leave Cycle Length (Months)',
+                'value' => '36',
+                'type' => 'integer',
+                'description' => 'Length of the paid sick leave cycle in months. Default 36 months.',
+                'sort_order' => 62,
+            ],
+            [
+                'key' => 'sick_leave_cycle_days',
+                'group' => 'Attendance',
+                'label' => 'Sick Leave Days per Cycle',
+                'value' => '30',
+                'type' => 'integer',
+                'description' => 'Paid sick leave working days per cycle. Default 30 working days (6 weeks on a five-day week).',
+                'sort_order' => 63,
+            ],
+            [
+                'key' => 'attendance_history_retention_months',
+                'group' => 'Attendance',
+                'label' => 'Attendance History Retention (Months)',
+                'value' => '0',
+                'type' => 'integer',
+                'description' => 'How many months of attendance history to keep. 0 keeps history forever. Values below 12 are treated as 12 so at least a full year is always retained.',
+                'sort_order' => 64,
+            ],
+        ];
+
+        foreach ($settings as $setting) {
+            $exists = DB::table('system_settings')->where('key', $setting['key'])->exists();
+            if (!$exists) {
+                DB::table('system_settings')->insert(array_merge($setting, [
+                    'is_core' => false,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]));
+            }
+        }
+    }
+
+    private function seedV290Version(): void
+    {
+        if (Schema::hasTable('system_settings')) {
+            DB::table('system_settings')->updateOrInsert(
+                ['key' => 'platform_version'],
+                [
+                    'group' => 'Identity',
+                    'label' => 'Platform Version',
+                    'value' => '2.9.0',
+                    'type' => 'text',
+                    'description' => 'Current ISO Admin Command Framework package version.',
+                    'sort_order' => 5,
+                    'is_core' => true,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
+    }
+
 }
