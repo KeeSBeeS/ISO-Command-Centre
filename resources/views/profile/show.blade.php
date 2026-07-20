@@ -33,8 +33,11 @@
                 <tr>
                     <td><strong>{{ $document->title }}</strong><br><span class="muted small">{{ $document->original_filename }} · {{ $document->file_size_label }}</span></td>
                     <td><span class="pill">{{ $document->type_label }}</span></td>
-                    <td>{{ $document->has_expiry ? optional($document->expires_at)->format('Y-m-d') : 'No expiry' }}</td>
-                    <td><span class="pill {{ in_array($document->expiry_state, ['expired','inactive']) ? 'off' : '' }}">{{ str_replace('-', ' ', ucfirst($document->expiry_state)) }}</span></td>
+                    <td>
+                        {{ $document->has_expiry ? optional($document->expires_at)->format('Y-m-d') : 'No expiry' }}
+                        @if($document->has_expiry)<br><span class="muted small">{{ $document->expiry_summary }}</span>@endif
+                    </td>
+                    <td>@include('employee_documents._status_pill')</td>
                     <td>@if(auth()->user()->hasPermission('employee_documents.view'))<a class="btn" href="{{ route('employee_documents.download', $document) }}">Download</a>@else<span class="muted">No access</span>@endif</td>
                 </tr>
             @empty

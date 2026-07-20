@@ -2223,4 +2223,65 @@ class UpdateController extends Controller
         }
     }
 
+    public function v288()
+    {
+        $systemVersion = Schema::hasTable('system_settings')
+            ? DB::table('system_settings')->where('key', 'platform_version')->value('value')
+            : null;
+        $permissionExists = Permission::where('slug', 'employee_compliance.view')->exists();
+
+        return view('updates.v2_8_8', compact('systemVersion', 'permissionExists'));
+    }
+
+    public function applyV288(Request $request)
+    {
+        DB::transaction(function () {
+            $this->seedEmployeeCompliancePermission();
+            $this->seedV288Version();
+        });
+
+        $this->seedSystemAdministratorAllPermissions($request->user());
+
+        return redirect()->route('updates.v2_8_8')->with('success', 'Version 2.8.8 applied. The Employee Compliance Overview page and dashboard widget are now available.');
+    }
+
+    private function seedEmployeeCompliancePermission(): void
+    {
+        $permission = Permission::firstOrCreate(
+            ['slug' => 'employee_compliance.view'],
+            [
+                'name' => 'View Employee Compliance',
+                'module' => 'Employee Documents',
+                'description' => 'View the employee document compliance overview.',
+            ]
+        );
+
+        if ($director = Role::where('slug', 'director')->first()) {
+            $director->permissions()->syncWithoutDetaching([$permission->id]);
+        }
+        if ($manager = Role::where('slug', 'manager')->first()) {
+            $manager->permissions()->syncWithoutDetaching([$permission->id]);
+        }
+    }
+
+    private function seedV288Version(): void
+    {
+        if (Schema::hasTable('system_settings')) {
+            DB::table('system_settings')->updateOrInsert(
+                ['key' => 'platform_version'],
+                [
+                    'group' => 'Identity',
+                    'label' => 'Platform Version',
+                    'value' => '2.8.8',
+                    'type' => 'text',
+                    'description' => 'Current ISO Admin Command Framework package version.',
+                    'sort_order' => 5,
+                    'is_core' => true,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
+    }
+
 }

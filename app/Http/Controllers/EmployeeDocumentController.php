@@ -22,25 +22,10 @@ class EmployeeDocumentController extends Controller
 
     public function store(Request $request, User $employee)
     {
-        $data = $request->validate([
-            'document_type' => ['required', 'string', 'in:' . implode(',', array_keys(EmployeeDocument::TYPES))],
-            'title' => ['required', 'string', 'max:255'],
-            'attachment' => ['required', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx,xls,xlsx,csv,txt'],
-            'has_expiry' => ['nullable', 'boolean'],
-            'expires_at' => ['nullable', 'date', 'required_if:has_expiry,1'],
-            'remind_days_before' => ['nullable', 'integer', 'min:0', 'max:365'],
-            'notes' => ['nullable', 'string', 'max:5000'],
-        ]);
+        $data = $this->validated($request, true);
 
         $file = $request->file('attachment');
-        $hasExpiry = (bool) $request->boolean('has_expiry');
-        $expiresAt = $hasExpiry ? $data['expires_at'] : null;
-        $remindDays = $hasExpiry ? (int) ($data['remind_days_before'] ?? 30) : null;
-        $reminderDate = null;
-
-        if ($hasExpiry && $expiresAt) {
-            $reminderDate = Carbon::parse($expiresAt)->subDays($remindDays)->toDateString();
-        }
+        [$hasExpiry, $expiresAt, $remindDays, $reminderDate] = $this->resolveExpiry($request, $data);
 
         $safeName = Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
         $extension = strtolower($file->getClientOriginalExtension() ?: 'file');
@@ -67,6 +52,66 @@ class EmployeeDocumentController extends Controller
         return redirect()->route('employees.show', $employee)->with('success', 'Employee document uploaded.');
     }
 
+    public function edit(EmployeeDocument $document)
+    {
+        return view('employee_documents.edit', [
+            'employee' => $document->employee,
+            'document' => $document,
+            'types' => EmployeeDocument::TYPES,
+        ]);
+    }
+
+    public function update(Request $request, EmployeeDocument $document)
+    {
+        $data = $this->validated($request, false);
+
+        [$hasExpiry, $expiresAt, $remindDays, $reminderDate] = $this->resolveExpiry($request, $data);
+
+        $updates = [
+            'document_type' => $data['document_type'],
+            'title' => $data['title'],
+            'has_expiry' => $hasExpiry,
+            'expires_at' => $expiresAt,
+            'remind_days_before' => $remindDays,
+            'reminder_date' => $reminderDate,
+            'notes' => $data['notes'] ?? null,
+        ];
+
+        if ($request->hasFile('attachment')) {
+            $file = $request->file('attachment');
+            $safeName = Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
+            $extension = strtolower($file->getClientOriginalExtension() ?: 'file');
+            $storedName = now()->format('YmdHis') . '-' . Str::random(8) . '-' . ($safeName ?: 'document') . '.' . $extension;
+            $path = $file->storeAs('employee-documents/' . $document->user_id, $storedName);
+
+            if (Storage::exists($document->file_path)) {
+                Storage::delete($document->file_path);
+            }
+
+            $updates['file_path'] = $path;
+            $updates['original_filename'] = $file->getClientOriginalName();
+            $updates['mime_type'] = $file->getClientMimeType();
+            $updates['size_bytes'] = $file->getSize();
+        }
+
+        $document->update($updates);
+
+        return redirect()->route('employees.show', $document->employee)->with('success', 'Employee document updated.');
+    }
+
+    public function destroy(EmployeeDocument $document)
+    {
+        $employee = $document->employee;
+
+        if (Storage::exists($document->file_path)) {
+            Storage::delete($document->file_path);
+        }
+
+        $document->delete();
+
+        return redirect()->route('employees.show', $employee)->with('success', 'Employee document deleted.');
+    }
+
     public function download(EmployeeDocument $document)
     {
         if (!Storage::exists($document->file_path)) {
@@ -81,6 +126,13 @@ class EmployeeDocumentController extends Controller
         $document->update(['status' => 'inactive']);
 
         return back()->with('success', 'Document marked as inactive.');
+    }
+
+    public function reactivate(Request $request, EmployeeDocument $document)
+    {
+        $document->update(['status' => 'active']);
+
+        return back()->with('success', 'Document reactivated.');
     }
 
     public function reminders(Request $request)
@@ -109,7 +161,14 @@ class EmployeeDocumentController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        return view('employee_documents.reminders', compact('documents', 'filter'));
+        $summary = [
+            'due' => EmployeeDocument::query()->where('has_expiry', true)->where('status', 'active')->whereDate('reminder_date', '<=', now()->toDateString())->count(),
+            'expired' => EmployeeDocument::query()->where('has_expiry', true)->where('status', 'active')->whereDate('expires_at', '<', now()->toDateString())->count(),
+            'next60' => EmployeeDocument::query()->where('has_expiry', true)->where('status', 'active')->whereDate('expires_at', '>=', now()->toDateString())->whereDate('expires_at', '<=', now()->addDays(60)->toDateString())->count(),
+            'inactive' => EmployeeDocument::query()->where('status', 'inactive')->count(),
+        ];
+
+        return view('employee_documents.reminders', compact('documents', 'filter', 'summary'));
     }
 
     public function sendReminderSummary(string $key)
@@ -161,5 +220,32 @@ class EmployeeDocumentController extends Controller
         EmployeeDocument::whereIn('id', $documents->pluck('id'))->update(['last_reminder_sent_at' => now()]);
 
         return response('Document reminder summary sent. Count: ' . $documents->count(), 200);
+    }
+
+    private function validated(Request $request, bool $attachmentRequired): array
+    {
+        return $request->validate([
+            'document_type' => ['required', 'string', 'in:' . implode(',', array_keys(EmployeeDocument::TYPES))],
+            'title' => ['required', 'string', 'max:255'],
+            'attachment' => [$attachmentRequired ? 'required' : 'nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,webp,doc,docx,xls,xlsx,csv,txt'],
+            'has_expiry' => ['nullable', 'boolean'],
+            'expires_at' => ['nullable', 'date', 'required_if:has_expiry,1'],
+            'remind_days_before' => ['nullable', 'integer', 'min:0', 'max:365'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+    }
+
+    private function resolveExpiry(Request $request, array $data): array
+    {
+        $hasExpiry = (bool) $request->boolean('has_expiry');
+        $expiresAt = $hasExpiry ? $data['expires_at'] : null;
+        $remindDays = $hasExpiry ? (int) ($data['remind_days_before'] ?? 30) : null;
+        $reminderDate = null;
+
+        if ($hasExpiry && $expiresAt) {
+            $reminderDate = Carbon::parse($expiresAt)->subDays($remindDays)->toDateString();
+        }
+
+        return [$hasExpiry, $expiresAt, $remindDays, $reminderDate];
     }
 }

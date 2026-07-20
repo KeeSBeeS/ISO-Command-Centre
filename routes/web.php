@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\EmployeeComplianceController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\CronJobController;
@@ -220,6 +221,13 @@ Route::middleware([EnsureInstalled::class])->group(function () {
             ->middleware(CheckPermission::class . ':settings.manage')
             ->name('updates.v2_8_6.apply');
 
+        Route::get('/updates/v2-8-8', [UpdateController::class, 'v288'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_8_8');
+        Route::post('/updates/v2-8-8', [UpdateController::class, 'applyV288'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_8_8.apply');
+
         Route::get('/profile', [ProfileController::class, 'show'])
             ->middleware(CheckPermission::class . ':profile.view')
             ->name('profile.show');
@@ -278,6 +286,10 @@ Route::middleware([EnsureInstalled::class])->group(function () {
         Route::get('/employee-documents/reminders', [EmployeeDocumentController::class, 'reminders'])
             ->middleware(CheckPermission::class . ':employee_documents.view')
             ->name('employee_documents.reminders');
+
+        Route::get('/employee-compliance', [EmployeeComplianceController::class, 'index'])
+            ->middleware(CheckPermission::class . ':employee_compliance.view')
+            ->name('employee_compliance.index');
 
         Route::get('/calendar', [CalendarController::class, 'index'])
             ->middleware(CheckPermission::class . ':calendar.view')
@@ -496,9 +508,21 @@ Route::middleware([EnsureInstalled::class])->group(function () {
         Route::get('/employee-documents/{document}/download', [EmployeeDocumentController::class, 'download'])
             ->middleware(CheckPermission::class . ':employee_documents.view')
             ->name('employee_documents.download');
+        Route::get('/employee-documents/{document}/edit', [EmployeeDocumentController::class, 'edit'])
+            ->middleware(CheckPermission::class . ':employee_documents.manage')
+            ->name('employee_documents.edit');
+        Route::put('/employee-documents/{document}', [EmployeeDocumentController::class, 'update'])
+            ->middleware(CheckPermission::class . ':employee_documents.manage')
+            ->name('employee_documents.update');
         Route::patch('/employee-documents/{document}/inactive', [EmployeeDocumentController::class, 'markInactive'])
             ->middleware(CheckPermission::class . ':employee_documents.manage')
             ->name('employee_documents.inactive');
+        Route::patch('/employee-documents/{document}/reactivate', [EmployeeDocumentController::class, 'reactivate'])
+            ->middleware(CheckPermission::class . ':employee_documents.manage')
+            ->name('employee_documents.reactivate');
+        Route::delete('/employee-documents/{document}', [EmployeeDocumentController::class, 'destroy'])
+            ->middleware(CheckPermission::class . ':employee_documents.manage')
+            ->name('employee_documents.destroy');
         Route::get('/employees/{employee}', [EmployeeController::class, 'show'])
             ->middleware(CheckPermission::class . ':employees.view')
             ->name('employees.show');

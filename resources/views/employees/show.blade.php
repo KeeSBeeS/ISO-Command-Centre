@@ -67,6 +67,23 @@
 @endif
 
 @if(\Illuminate\Support\Facades\Schema::hasTable('employee_documents') && auth()->user()->hasPermission('employee_documents.view'))
+@php
+    $sortedDocuments = $employee->documents->sortBy(function ($document) {
+        $rank = match ($document->expiry_state) {
+            'expired' => 0,
+            'reminder-due' => 1,
+            'valid' => 2,
+            default => 3,
+        };
+        return sprintf('%d-%s', $rank, optional($document->expires_at)->format('Y-m-d') ?? '9999-99-99');
+    });
+    $docCounts = [
+        'expired' => $employee->documents->where('status', 'active')->where('expiry_state', 'expired')->count(),
+        'reminder-due' => $employee->documents->where('status', 'active')->where('expiry_state', 'reminder-due')->count(),
+        'valid' => $employee->documents->where('status', 'active')->whereIn('expiry_state', ['valid', 'no-expiry'])->count(),
+        'total' => $employee->documents->count(),
+    ];
+@endphp
 <div class="card">
     <div class="actions" style="justify-content:space-between">
         <div>
@@ -77,6 +94,12 @@
             @if(auth()->user()->hasPermission('employee_documents.upload'))<a class="btn primary" href="{{ route('employee_documents.create',$employee) }}">Upload</a>@endif
             <a class="btn" href="{{ route('employee_documents.reminders') }}">Reminders</a>
         </div>
+    </div>
+    <div class="grid cols-4" style="margin-top:12px">
+        <div class="card metric"><span>Total Documents</span><strong>{{ $docCounts['total'] }}</strong></div>
+        <div class="card metric"><span>Expired</span><strong>{{ $docCounts['expired'] }}</strong></div>
+        <div class="card metric"><span>Reminder Due</span><strong>{{ $docCounts['reminder-due'] }}</strong></div>
+        <div class="card metric"><span>Valid / No Expiry</span><strong>{{ $docCounts['valid'] }}</strong></div>
     </div>
     <div class="table-wrap" style="margin-top:12px">
         <table>
@@ -91,7 +114,7 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse($employee->documents->sortByDesc('created_at') as $document)
+                @forelse($sortedDocuments as $document)
                     <tr>
                         <td>
                             <strong>{{ $document->title }}</strong><br>
@@ -99,7 +122,10 @@
                             @if($document->notes)<br><span class="muted small">{{ $document->notes }}</span>@endif
                         </td>
                         <td><span class="pill">{{ $document->type_label }}</span></td>
-                        <td>{{ $document->has_expiry ? optional($document->expires_at)->format('Y-m-d') : 'No expiry' }}</td>
+                        <td>
+                            {{ $document->has_expiry ? optional($document->expires_at)->format('Y-m-d') : 'No expiry' }}
+                            @if($document->has_expiry)<br><span class="muted small">{{ $document->expiry_summary }}</span>@endif
+                        </td>
                         <td>
                             @if($document->has_expiry)
                                 {{ optional($document->reminder_date)->format('Y-m-d') }}<br>
@@ -108,14 +134,26 @@
                                 <span class="muted">Not required</span>
                             @endif
                         </td>
-                        <td><span class="pill {{ in_array($document->expiry_state, ['expired','inactive']) ? 'off' : '' }}">{{ str_replace('-', ' ', ucfirst($document->expiry_state)) }}</span></td>
+                        <td>@include('employee_documents._status_pill')</td>
                         <td>
                             <div class="actions">
                                 <a class="btn" href="{{ route('employee_documents.download', $document) }}">Download</a>
-                                @if($document->status === 'active' && auth()->user()->hasPermission('employee_documents.manage'))
-                                    <form method="post" action="{{ route('employee_documents.inactive', $document) }}" onsubmit="return confirm('Mark this document as inactive?')">
-                                        @csrf @method('PATCH')
-                                        <button class="btn danger" type="submit">Inactive</button>
+                                @if(auth()->user()->hasPermission('employee_documents.manage'))
+                                    <a class="btn" href="{{ route('employee_documents.edit', $document) }}">Edit</a>
+                                    @if($document->status === 'active')
+                                        <form method="post" action="{{ route('employee_documents.inactive', $document) }}" onsubmit="return confirm('Mark this document as inactive?')">
+                                            @csrf @method('PATCH')
+                                            <button class="btn danger" type="submit">Inactive</button>
+                                        </form>
+                                    @else
+                                        <form method="post" action="{{ route('employee_documents.reactivate', $document) }}">
+                                            @csrf @method('PATCH')
+                                            <button class="btn" type="submit">Reactivate</button>
+                                        </form>
+                                    @endif
+                                    <form method="post" action="{{ route('employee_documents.destroy', $document) }}" onsubmit="return confirm('Permanently delete this document? This cannot be undone.')">
+                                        @csrf @method('DELETE')
+                                        <button class="btn danger" type="submit">Delete</button>
                                     </form>
                                 @endif
                             </div>
