@@ -1,45 +1,51 @@
-# ISO Admin Command Framework v2.8.5 - Employee Compliance Route Hotfix
+# ISO Admin Command Framework v2.8.5 - Missing Route Safety-Net Hotfix (Revision 2)
 
 ## Problem
 
-After logging in, the dashboard fails with:
+After logging in, the dashboard fails with errors such as:
 
 ```
 Symfony\Component\Routing\Exception\RouteNotFoundException
 Route [employee_compliance.index] not defined.
+
+Symfony\Component\Routing\Exception\RouteNotFoundException
+Route [platform_updates.index] not defined.
 ```
 
-The dashboard compliance widget (added in the v2.8.0 Employee Compliance update)
-links to the named route `employee_compliance.index`. If `routes/web.php` on the
-server no longer contains the employee compliance routes - for example because a
-later changed-files-only update replaced `routes/web.php` with a version built
-without the compliance module - the dashboard can no longer render and login is
-blocked for every user.
+Views installed by overlay update packages (the v2.8.0 Employee Compliance
+dashboard widget, the v2.7.0 Update Manager navigation, ...) link to named
+routes. If `routes/web.php` on the server no longer contains those routes -
+for example because a later changed-files-only update replaced `routes/web.php`
+with a version built without those modules - any page that renders such a link
+throws `RouteNotFoundException`, and login is blocked for every user.
 
 ## Fix
 
-This hotfix registers a safety-net route from `app/Providers/AppServiceProvider.php`,
-after all route files have loaded:
+This hotfix adds a safety net in `app/Providers/AppServiceProvider.php`,
+applied after all route files have loaded:
 
-- If `employee_compliance.index` is already defined by `routes/web.php`, the
-  hotfix does nothing.
-- If the route is missing, it is registered at `/employee-compliance` with the
-  same middleware stack as other authenticated pages (auth, forced password
-  change, permission check `employee_compliance.view`).
-- When the route is hit, the v2.8.0 `EmployeeComplianceController@index` is used
-  when its file is present on the server, so the full compliance overview keeps
-  working. If the controller file is not present, a simple notice page is shown
+- Fallback routes are registered for known module pages, currently
+  `employee_compliance.index` (`/employee-compliance`) and
+  `platform_updates.index` (`/platform-updates`). If `routes/web.php` already
+  defines the route, the fallback is skipped and the real route wins.
+- When a fallback route is opened, the real module controller is used if its
+  file is present on the server, so the page keeps working fully. If the
+  module files are not present, a friendly "page unavailable" notice is shown
   instead of an error.
+- Any OTHER missing named route no longer throws while rendering: the link is
+  generated to a generic notice page (`/module-unavailable`) instead. This
+  means future missing-route problems show a notice when the link is clicked
+  rather than blocking login.
 - The safety net also works when a stale route cache
   (`bootstrap/cache/routes-v7.php`) is active on the server.
-
-Login and the dashboard work again in all cases.
 
 ## Changed / added files
 
 ```
 app/Providers/AppServiceProvider.php                             (changed)
-app/Http/Controllers/EmployeeComplianceFallbackController.php    (new)
+app/Http/Controllers/ModuleFallbackController.php                (new)
+app/Http/Controllers/EmployeeComplianceFallbackController.php    (new, kept for compatibility with revision 1)
+resources/views/system/module_unavailable.blade.php              (new)
 resources/views/employee_compliance/fallback.blade.php           (new)
 README_V2_8_5_COMPLIANCE_ROUTE_HOTFIX.md                         (new)
 ```
@@ -49,21 +55,24 @@ No database changes. No artisan command is required.
 ## Apply
 
 1. Upload the files above into the same folder structure on the server,
-   overwriting `app/Providers/AppServiceProvider.php`. Do not upload or replace
-   any other files.
+   overwriting `app/Providers/AppServiceProvider.php` (and the revision 1
+   files if you applied that earlier). Do not delete or replace any other
+   files.
 2. Recommended: if the file `bootstrap/cache/routes-v7.php` exists on the
    server, delete it (it is a stale route cache and is rebuilt automatically).
    If you have shell access you can run `php artisan route:clear` instead. The
    hotfix works even if you skip this step, but a stale cache can hide other
    routes from later updates.
-3. Log in again. The dashboard should load, and the compliance widget "Open"
-   link should work.
+3. Log in again. The dashboard should load. The compliance widget "Open" link
+   and the Update Manager link either open their real module page (when the
+   module files are installed) or show a notice page.
 
-## Note
+## Root cause and long-term fix
 
-If, after login works again, other pages report a different missing route
-beginning with `employee_compliance.` or a policy-related route name, the
-server's `routes/web.php` lost more of the v2.8.0 compliance routes than the
-dashboard link. In that case re-apply the v2.8.0 Employee Compliance update
-package (its `routes/web.php` and module files), then re-apply the latest
-update on top.
+The v2.7.0 Update Manager and v2.8.0 Employee Compliance module files were
+distributed as changed-files-only packages but were never added to the source
+repository. Every later update package built from the repository therefore
+ships a `routes/web.php` without those modules' routes, and applying one
+removes the routes from the server again. The long-term fix is to re-apply the
+v2.7.0 and v2.8.0 packages' module files (including their route definitions)
+and commit them to the repository so future packages include them.
