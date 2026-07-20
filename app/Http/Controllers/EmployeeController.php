@@ -120,23 +120,7 @@ class EmployeeController extends Controller
 
         $employee->load($relations);
 
-        $lateAttendanceStats = null;
-        $recentLateAttendance = collect();
-        if (Schema::hasTable('attendance_days') && Schema::hasColumn('attendance_days', 'is_late')) {
-            $lateAttendanceStats = [
-                'last_30_days' => AttendanceDay::where('user_id', $employee->id)->where('is_late', true)->whereDate('attendance_date', '>=', now()->subDays(30)->toDateString())->count(),
-                'last_90_days' => AttendanceDay::where('user_id', $employee->id)->where('is_late', true)->whereDate('attendance_date', '>=', now()->subDays(90)->toDateString())->count(),
-                'all_time' => AttendanceDay::where('user_id', $employee->id)->where('is_late', true)->count(),
-            ];
-
-            $recentLateAttendance = AttendanceDay::where('user_id', $employee->id)
-                ->where('is_late', true)
-                ->orderByDesc('attendance_date')
-                ->limit(10)
-                ->get();
-        }
-
-        return view('employees.show', compact('employee', 'lateAttendanceStats', 'recentLateAttendance'));
+        return view('employees.show', compact('employee'));
     }
 
     public function edit(User $employee)

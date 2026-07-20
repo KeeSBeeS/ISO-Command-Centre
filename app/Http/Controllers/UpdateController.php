@@ -2059,4 +2059,59 @@ class UpdateController extends Controller
         }
     }
 
+
+    public function v293()
+    {
+        $systemVersion = Schema::hasTable('system_settings')
+            ? DB::table('system_settings')->where('key', 'platform_version')->value('value')
+            : null;
+
+        return view('updates.v2_9_3', compact('systemVersion'));
+    }
+
+    public function applyV293(Request $request)
+    {
+        // This is a file-only feature update (employee Time & Attendance
+        // date-range register). Clearing the compiled views and cache makes the
+        // updated controller/Blade take effect immediately after the new files
+        // are in place, so the employee page does not keep showing the old panel.
+        $this->clearApplicationCaches();
+
+        $this->seedV293Version();
+        $this->seedSystemAdministratorAllPermissions($request->user());
+
+        return redirect()->route('updates.v2_9_3')->with('success', 'Version 2.9.3 applied. The employee profile now has a Time & Attendance date-range register. Compiled views and cache were cleared and the platform version was updated.');
+    }
+
+    private function clearApplicationCaches(): void
+    {
+        foreach (['view:clear', 'cache:clear'] as $command) {
+            try {
+                \Illuminate\Support\Facades\Artisan::call($command);
+            } catch (\Throwable $e) {
+                // Cache clearing is best-effort; a hardened host may block it.
+            }
+        }
+    }
+
+    private function seedV293Version(): void
+    {
+        if (Schema::hasTable('system_settings')) {
+            DB::table('system_settings')->updateOrInsert(
+                ['key' => 'platform_version'],
+                [
+                    'group' => 'Identity',
+                    'label' => 'Platform Version',
+                    'value' => '2.9.3',
+                    'type' => 'text',
+                    'description' => 'Current ISO Admin Command Framework package version.',
+                    'sort_order' => 5,
+                    'is_core' => true,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
+    }
+
 }

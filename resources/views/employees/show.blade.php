@@ -30,41 +30,7 @@
     </div>
 </div>
 <div style="height:14px"></div>
-@if(isset($lateAttendanceStats) && auth()->user()->hasPermission('attendance.late.view'))
-<div class="card">
-    <div class="actions" style="justify-content:space-between">
-        <div>
-            <h2 style="margin-bottom:6px">Late Attendance Tracking</h2>
-            <p class="muted">Clock-ins after 09:00 are tracked per employee. Public holidays are excluded because the company is closed.</p>
-        </div>
-        @if(auth()->user()->hasPermission('attendance.view'))<a class="btn" href="{{ route('attendance.index', ['search' => $employee->name, 'late_only' => 1]) }}">Open Late Records</a>@endif
-    </div>
-    <div class="grid cols-4" style="margin-top:12px">
-        <div class="card metric"><span>Last 30 Days</span><strong>{{ $lateAttendanceStats['last_30_days'] }}</strong></div>
-        <div class="card metric"><span>Last 90 Days</span><strong>{{ $lateAttendanceStats['last_90_days'] }}</strong></div>
-        <div class="card metric"><span>All Time</span><strong>{{ $lateAttendanceStats['all_time'] }}</strong></div>
-    </div>
-    <div class="table-wrap" style="margin-top:12px">
-        <table>
-            <thead><tr><th>Date</th><th>Clock-in</th><th>Late By</th><th>Checkout</th><th>Action</th></tr></thead>
-            <tbody>
-                @forelse($recentLateAttendance as $lateDay)
-                    <tr>
-                        <td>{{ optional($lateDay->attendance_date)->format('Y-m-d') }}</td>
-                        <td>{{ optional($lateDay->start_time)->format('H:i:s') }}</td>
-                        <td>{{ $lateDay->late_label }}</td>
-                        <td>{{ optional($lateDay->end_time)->format('H:i:s') ?? '-' }}</td>
-                        <td>@if(auth()->user()->hasPermission('attendance.view'))<a class="btn" href="{{ route('attendance.show', $lateDay) }}">View</a>@endif</td>
-                    </tr>
-                @empty
-                    <tr><td colspan="5" class="muted">No late clock-ins recorded.</td></tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
-</div>
-<div style="height:14px"></div>
-@endif
+@include('employees._time_attendance')
 
 @if(\Illuminate\Support\Facades\Schema::hasTable('employee_documents') && auth()->user()->hasPermission('employee_documents.view'))
 <div class="card">
