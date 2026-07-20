@@ -42,6 +42,9 @@ class ApplicationSmokeTest extends TestCase
         'updates.v2_6_9.apply',
         'updates.v2_6_10.apply',
         'updates.v2_6_11.apply',
+        'updates.v2_8_6.apply',
+        'updates.v2_8_8.apply',
+        'updates.v2_9_0.apply',
     ];
 
     /**

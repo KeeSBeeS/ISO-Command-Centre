@@ -241,10 +241,10 @@ class CustomerController extends Controller
             $uniqueCode .= ',' . $ignoreCustomerId;
         }
 
-        return $request->validate([
+        $data = $request->validate([
             'company_name' => ['required', 'string', 'max:255'],
             'customer_code' => explode('|', $uniqueCode),
-            'customer_type' => ['required', 'in:' . implode(',', $this->customerTypeValues())],
+            'customer_type' => ['nullable', 'in:' . implode(',', $this->customerTypeValues())],
             'industry' => ['nullable', 'string', 'max:255'],
             'contact_person' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
@@ -255,6 +255,10 @@ class CustomerController extends Controller
             'account_manager_id' => ['nullable', 'integer', 'exists:users,id'],
             'notes' => ['nullable', 'string'],
         ]);
+
+        $data['customer_type'] = $data['customer_type'] ?? 'customer';
+
+        return $data;
     }
 
     private function validatedSite(Request $request): array
