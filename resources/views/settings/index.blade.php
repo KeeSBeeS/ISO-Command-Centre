@@ -59,6 +59,6 @@
     </form>
 </div>
 <style>
-.mini-card{border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.035);padding:14px}.mini-card span{display:block;color:var(--muted);font-size:12px}.mini-card strong{display:block;margin-top:6px;word-break:break-word}@media(max-width:720px){.mini-card{padding:12px}}
+.mini-card{border:1px solid var(--line);border-radius:18px;background:rgba(15,23,42,.035);padding:14px}.mini-card span{display:block;color:var(--muted);font-size:12px}.mini-card strong{display:block;margin-top:6px;word-break:break-word}@media(max-width:720px){.mini-card{padding:12px}}
 </style>
 @endsection

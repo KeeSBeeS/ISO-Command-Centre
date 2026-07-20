@@ -6,9 +6,15 @@
     <div class="actions" style="justify-content:space-between">
         <div>
             <h2 style="margin-bottom:6px">Documents Needing Attention</h2>
-            <p class="muted">Expiry reminders are calculated from each document expiry date minus the selected advance reminder time.</p>
+            <p class="muted">Expiry reminders are calculated from each document expiry date minus the selected advance reminder time. These also appear on the calendar.</p>
         </div>
         <a class="btn" href="{{ route('employees.index') }}">Employees</a>
+    </div>
+    <div class="grid cols-4" style="margin-top:12px">
+        <div class="card metric"><span>Due Now</span><strong>{{ $summary['due'] }}</strong></div>
+        <div class="card metric"><span>Expired</span><strong>{{ $summary['expired'] }}</strong></div>
+        <div class="card metric"><span>Next 60 Days</span><strong>{{ $summary['next60'] }}</strong></div>
+        <div class="card metric"><span>Inactive</span><strong>{{ $summary['inactive'] }}</strong></div>
     </div>
     <div class="actions" style="margin-top:12px">
         <a class="btn {{ $filter === 'due' ? 'primary' : '' }}" href="{{ route('employee_documents.reminders', ['filter' => 'due']) }}">Due Now</a>
@@ -44,26 +50,34 @@
                             <span class="muted small">{{ $document->original_filename }}</span>
                         </td>
                         <td><span class="pill">{{ $document->type_label }}</span></td>
-                        <td>{{ optional($document->expires_at)->format('Y-m-d') ?? 'No expiry' }}</td>
+                        <td>
+                            {{ optional($document->expires_at)->format('Y-m-d') ?? 'No expiry' }}
+                            @if($document->has_expiry)<br><span class="muted small">{{ $document->expiry_summary }}</span>@endif
+                        </td>
                         <td>
                             {{ optional($document->reminder_date)->format('Y-m-d') ?? 'None' }}<br>
                             <span class="muted small">{{ $document->remind_days_before }} days before</span>
                         </td>
-                        <td>
-                            @php $state = $document->expiry_state; @endphp
-                            <span class="pill {{ $state === 'expired' || $state === 'inactive' ? 'off' : '' }}">{{ str_replace('-', ' ', ucfirst($state)) }}</span>
-                        </td>
+                        <td>@include('employee_documents._status_pill')</td>
                         <td>
                             <div class="actions">
                                 <a class="btn" href="{{ route('employee_documents.download', $document) }}">Download</a>
                                 @if($document->employee)
                                     <a class="btn" href="{{ route('employees.show', $document->employee) }}">Profile</a>
                                 @endif
-                                @if($document->status === 'active' && auth()->user()->hasPermission('employee_documents.manage'))
-                                    <form method="post" action="{{ route('employee_documents.inactive', $document) }}" onsubmit="return confirm('Mark this document as inactive?')">
-                                        @csrf @method('PATCH')
-                                        <button class="btn danger" type="submit">Inactive</button>
-                                    </form>
+                                @if(auth()->user()->hasPermission('employee_documents.manage'))
+                                    <a class="btn" href="{{ route('employee_documents.edit', $document) }}">Edit</a>
+                                    @if($document->status === 'active')
+                                        <form method="post" action="{{ route('employee_documents.inactive', $document) }}" onsubmit="return confirm('Mark this document as inactive?')">
+                                            @csrf @method('PATCH')
+                                            <button class="btn danger" type="submit">Inactive</button>
+                                        </form>
+                                    @else
+                                        <form method="post" action="{{ route('employee_documents.reactivate', $document) }}">
+                                            @csrf @method('PATCH')
+                                            <button class="btn" type="submit">Reactivate</button>
+                                        </form>
+                                    @endif
                                 @endif
                             </div>
                         </td>

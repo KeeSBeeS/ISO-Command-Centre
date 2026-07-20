@@ -91,6 +91,39 @@ class EmployeeDocument extends Model
         return 'valid';
     }
 
+    public function getExpiryBadgeClassAttribute(): string
+    {
+        return match ($this->expiry_state) {
+            'expired' => 'danger',
+            'reminder-due' => 'warn',
+            'inactive', 'no-expiry' => 'off',
+            default => '',
+        };
+    }
+
+    public function getExpirySummaryAttribute(): string
+    {
+        if (!$this->has_expiry || !$this->expires_at) {
+            return 'No expiry';
+        }
+
+        if ($this->status !== 'active') {
+            return 'Inactive';
+        }
+
+        $days = (int) now()->startOfDay()->diffInDays($this->expires_at->copy()->startOfDay(), false);
+
+        if ($days < 0) {
+            return 'Expired ' . abs($days) . ' day' . (abs($days) === 1 ? '' : 's') . ' ago';
+        }
+
+        if ($days === 0) {
+            return 'Expires today';
+        }
+
+        return 'Expires in ' . $days . ' day' . ($days === 1 ? '' : 's');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');

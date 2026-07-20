@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\EmployeeComplianceController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\InstallController;
 use App\Http\Controllers\CronJobController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\GoogleApiSettingController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveTypeController;
+use App\Http\Controllers\PlatformUpdateController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UpdateController;
@@ -213,6 +215,52 @@ Route::middleware([EnsureInstalled::class])->group(function () {
             ->middleware(CheckPermission::class . ':settings.manage')
             ->name('updates.v2_6_11.apply');
 
+        Route::get('/updates/v2-8-6', [UpdateController::class, 'v286'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_8_6');
+        Route::post('/updates/v2-8-6', [UpdateController::class, 'applyV286'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_8_6.apply');
+
+        Route::get('/updates/v2-8-8', [UpdateController::class, 'v288'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_8_8');
+        Route::post('/updates/v2-8-8', [UpdateController::class, 'applyV288'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_8_8.apply');
+
+        Route::get('/updates/v2-9-0', [UpdateController::class, 'v290'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_9_0');
+        Route::post('/updates/v2-9-0', [UpdateController::class, 'applyV290'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_9_0.apply');
+
+        Route::get('/settings/updates', [PlatformUpdateController::class, 'index'])
+            ->middleware(CheckPermission::class . ':platform_updates.view')
+            ->name('platform_updates.index');
+        Route::put('/settings/updates/settings', [PlatformUpdateController::class, 'updateSettings'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.settings.update');
+        Route::post('/settings/updates/upload', [PlatformUpdateController::class, 'upload'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.upload');
+        Route::post('/settings/updates/github-download', [PlatformUpdateController::class, 'downloadGithub'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.github.download');
+        Route::post('/settings/updates/apply', [PlatformUpdateController::class, 'apply'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.apply');
+        Route::delete('/settings/updates/packages/{filename}', [PlatformUpdateController::class, 'destroyPackage'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.packages.destroy');
+        Route::get('/settings/updates/backups/{filename}/download', [PlatformUpdateController::class, 'downloadBackup'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.backups.download');
+        Route::delete('/settings/updates/backups/{filename}', [PlatformUpdateController::class, 'destroyBackup'])
+            ->middleware(CheckPermission::class . ':platform_updates.manage')
+            ->name('platform_updates.backups.destroy');
+
         Route::get('/profile', [ProfileController::class, 'show'])
             ->middleware(CheckPermission::class . ':profile.view')
             ->name('profile.show');
@@ -271,6 +319,10 @@ Route::middleware([EnsureInstalled::class])->group(function () {
         Route::get('/employee-documents/reminders', [EmployeeDocumentController::class, 'reminders'])
             ->middleware(CheckPermission::class . ':employee_documents.view')
             ->name('employee_documents.reminders');
+
+        Route::get('/employee-compliance', [EmployeeComplianceController::class, 'index'])
+            ->middleware(CheckPermission::class . ':employee_compliance.view')
+            ->name('employee_compliance.index');
 
         Route::get('/calendar', [CalendarController::class, 'index'])
             ->middleware(CheckPermission::class . ':calendar.view')
@@ -437,6 +489,39 @@ Route::middleware([EnsureInstalled::class])->group(function () {
         Route::get('/clients', [CustomerController::class, 'index'])
             ->middleware(CheckPermission::class . ':clients.view');
 
+        Route::post('/customers/{customer}/sites', [CustomerController::class, 'storeSite'])
+            ->middleware(CheckPermission::class . ':customer_sites.manage')
+            ->name('customers.sites.store');
+        Route::put('/customers/{customer}/sites/{site}', [CustomerController::class, 'updateSite'])
+            ->middleware(CheckPermission::class . ':customer_sites.manage')
+            ->name('customers.sites.update');
+        Route::delete('/customers/{customer}/sites/{site}', [CustomerController::class, 'destroySite'])
+            ->middleware(CheckPermission::class . ':customer_sites.manage')
+            ->name('customers.sites.destroy');
+
+        Route::post('/customers/{customer}/contacts', [CustomerController::class, 'storeContact'])
+            ->middleware(CheckPermission::class . ':customer_contacts.manage')
+            ->name('customers.contacts.store');
+        Route::post('/customers/{customer}/sites/{site}/contacts', [CustomerController::class, 'storeSiteContact'])
+            ->middleware(CheckPermission::class . ':customer_contacts.manage')
+            ->name('customers.sites.contacts.store');
+        Route::put('/customers/{customer}/contacts/{contact}', [CustomerController::class, 'updateContact'])
+            ->middleware(CheckPermission::class . ':customer_contacts.manage')
+            ->name('customers.contacts.update');
+        Route::delete('/customers/{customer}/contacts/{contact}', [CustomerController::class, 'destroyContact'])
+            ->middleware(CheckPermission::class . ':customer_contacts.manage')
+            ->name('customers.contacts.destroy');
+
+        Route::post('/customers/{customer}/interactions', [CustomerController::class, 'storeInteraction'])
+            ->middleware(CheckPermission::class . ':customer_interactions.manage')
+            ->name('customers.interactions.store');
+        Route::put('/customers/{customer}/interactions/{interaction}', [CustomerController::class, 'updateInteraction'])
+            ->middleware(CheckPermission::class . ':customer_interactions.manage')
+            ->name('customers.interactions.update');
+        Route::delete('/customers/{customer}/interactions/{interaction}', [CustomerController::class, 'destroyInteraction'])
+            ->middleware(CheckPermission::class . ':customer_interactions.manage')
+            ->name('customers.interactions.destroy');
+
         Route::get('/employees', [EmployeeController::class, 'index'])
             ->middleware(CheckPermission::class . ':employees.view')
             ->name('employees.index');
@@ -456,9 +541,21 @@ Route::middleware([EnsureInstalled::class])->group(function () {
         Route::get('/employee-documents/{document}/download', [EmployeeDocumentController::class, 'download'])
             ->middleware(CheckPermission::class . ':employee_documents.view')
             ->name('employee_documents.download');
+        Route::get('/employee-documents/{document}/edit', [EmployeeDocumentController::class, 'edit'])
+            ->middleware(CheckPermission::class . ':employee_documents.manage')
+            ->name('employee_documents.edit');
+        Route::put('/employee-documents/{document}', [EmployeeDocumentController::class, 'update'])
+            ->middleware(CheckPermission::class . ':employee_documents.manage')
+            ->name('employee_documents.update');
         Route::patch('/employee-documents/{document}/inactive', [EmployeeDocumentController::class, 'markInactive'])
             ->middleware(CheckPermission::class . ':employee_documents.manage')
             ->name('employee_documents.inactive');
+        Route::patch('/employee-documents/{document}/reactivate', [EmployeeDocumentController::class, 'reactivate'])
+            ->middleware(CheckPermission::class . ':employee_documents.manage')
+            ->name('employee_documents.reactivate');
+        Route::delete('/employee-documents/{document}', [EmployeeDocumentController::class, 'destroy'])
+            ->middleware(CheckPermission::class . ':employee_documents.manage')
+            ->name('employee_documents.destroy');
         Route::get('/employees/{employee}', [EmployeeController::class, 'show'])
             ->middleware(CheckPermission::class . ':employees.view')
             ->name('employees.show');

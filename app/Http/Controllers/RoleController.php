@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class RoleController extends Controller
@@ -28,15 +29,17 @@ class RoleController extends Controller
     public function store(Request $request)
     {
         $data = $this->validated($request);
-        $role = Role::create([
-            'name' => $data['name'],
-            'slug' => Str::slug($data['name']),
-            'description' => $data['description'] ?? null,
-            'level' => $data['level'] ?? 10,
-            'is_system' => false,
-        ]);
+        DB::transaction(function () use ($data) {
+            $role = Role::create([
+                'name' => $data['name'],
+                'slug' => Str::slug($data['name']),
+                'description' => $data['description'] ?? null,
+                'level' => $data['level'] ?? 10,
+                'is_system' => false,
+            ]);
 
-        $role->permissions()->sync($data['permission_ids'] ?? []);
+            $role->permissions()->sync($data['permission_ids'] ?? []);
+        });
 
         return redirect()->route('roles.index')->with('success', 'Role created.');
     }
@@ -56,14 +59,16 @@ class RoleController extends Controller
     {
         $data = $this->validated($request, $role->id);
 
-        $role->update([
-            'name' => $data['name'],
-            'slug' => $role->is_system ? $role->slug : Str::slug($data['name']),
-            'description' => $data['description'] ?? null,
-            'level' => $data['level'] ?? $role->level,
-        ]);
+        DB::transaction(function () use ($data, $role) {
+            $role->update([
+                'name' => $data['name'],
+                'slug' => $role->is_system ? $role->slug : Str::slug($data['name']),
+                'description' => $data['description'] ?? null,
+                'level' => $data['level'] ?? $role->level,
+            ]);
 
-        $role->permissions()->sync($data['permission_ids'] ?? []);
+            $role->permissions()->sync($data['permission_ids'] ?? []);
+        });
 
         return redirect()->route('roles.index')->with('success', 'Role updated.');
     }
