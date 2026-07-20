@@ -89,10 +89,23 @@ class CoreSettingController extends Controller
 
     private function coreSettingsQuery(): Builder
     {
-        return SystemSetting::query()
+        $query = SystemSetting::query();
+        $group = $query->getQuery()->getGrammar()->wrap('group');
+
+        return $query
             ->where('is_core', true)
             ->whereNotIn('group', ['Vehicle Tracking API', 'Google API'])
-            ->orderByRaw("FIELD(`group`, 'Attendance', 'Identity', 'Notifications', 'Reminders', 'Documents', 'Security', 'Vehicles')")
+            ->orderByRaw(
+                "case {$group}"
+                . " when 'Attendance' then 1"
+                . " when 'Identity' then 2"
+                . " when 'Notifications' then 3"
+                . " when 'Reminders' then 4"
+                . " when 'Documents' then 5"
+                . " when 'Security' then 6"
+                . " when 'Vehicles' then 7"
+                . " else 0 end"
+            )
             ->orderBy('group')
             ->orderBy('sort_order')
             ->orderBy('label');
