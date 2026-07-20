@@ -43,38 +43,48 @@ The section is visible to users with `attendance.view` or `attendance.late.view`
 
 No database migration is required. The register is built from the attendance data that is already imported.
 
-## Changed files (upload these to the SAME paths on your server)
+## Changed / new files (upload these to the SAME paths on your server)
 
-- `app/Http/Controllers/EmployeeController.php`
-- `resources/views/employees/show.blade.php`
+- `app/Http/Controllers/EmployeeController.php` (changed — the feature)
+- `resources/views/employees/show.blade.php` (changed — the feature)
+- `app/Http/Controllers/UpdateController.php` (changed — adds the v2.9.3 apply step)
+- `routes/web.php` (changed — adds the `/updates/v2-9-3` route)
+- `resources/views/updates/v2_9_3.blade.php` (new — the Update Manager page)
 - `VERSION`
 
 The zip mirrors your project's folder layout. Extract it INTO your project root
-so `app/...` and `resources/...` merge with your existing folders. Do **not**
-upload a wrapper folder — the files must land at, for example,
+so `app/...`, `routes/...` and `resources/...` merge with your existing folders.
+Do **not** upload a wrapper folder — the files must land at, for example,
 `app/Http/Controllers/EmployeeController.php`, overwriting the existing file.
 
-## IMPORTANT: clear caches after uploading
+## Apply with the Update Manager (recommended)
 
-This update changes both a controller and a Blade view. If the page "looks
-exactly the same" after uploading, the server is almost always serving a
-**cached compiled view** or the old file via **OPcache**. Do one of the
-following after uploading:
+After the files are uploaded, open:
 
-If you have SSH / command-line access, run from the project root:
+`/updates/v2-9-3`
 
-```
-php artisan view:clear
-php artisan cache:clear
-```
+and click **Apply v2.9.3**. This runs the same way as the other versioned
+updates in this platform. Applying it will:
 
-If you do NOT have command-line access (cPanel / FTP only):
+- Clear the compiled views and application cache (so the new employee page
+  shows immediately instead of the old cached one).
+- Update the stored platform version to `2.9.3`.
+- Re-sync System Administrator permissions.
 
-1. Delete every file inside `storage/framework/views/` (keep the folder).
-   These are auto-generated compiled Blade files and are rebuilt on the next
-   page load.
-2. If your host uses OPcache, restart PHP (in cPanel: "Restart PHP" / switch
-   the PHP version off and on, or wait for the pool to recycle).
+You need the `settings.manage` permission to open and apply the update.
+
+## If the page still "looks exactly the same"
+
+That symptom means the old file is still being served — either the new files
+were uploaded to the wrong folder, or a compiled view / OPcache is stale.
+
+1. Confirm the upload landed: open `resources/views/employees/show.blade.php`
+   on the server and search for `Time & Attendance`. If that text is missing,
+   the file was not overwritten — re-upload it to the correct path.
+2. Apply `/updates/v2-9-3` (it clears the caches for you), or manually:
+   - With SSH: `php artisan view:clear && php artisan cache:clear`
+   - cPanel / FTP only: delete every file inside `storage/framework/views/`
+     (keep the folder), then restart PHP / OPcache.
 
 ## How to confirm it worked
 
@@ -82,11 +92,4 @@ If you do NOT have command-line access (cPanel / FTP only):
 2. You should now see a **Time & Attendance** card with **Date From / Date To**
    inputs and an **Apply Date Range** button — the old "Late Attendance
    Tracking" panel is gone.
-3. The footer version reads `v2.9.3` only if your platform version setting is
-   updated by a later update step; the feature itself does not depend on it.
-
-## Verify the upload actually replaced the file
-
-Open `resources/views/employees/show.blade.php` on the server and search for
-`Time & Attendance`. If that text is missing, the file was not overwritten
-(usually uploaded to the wrong folder) — re-upload to the correct path.
+3. The footer version reads `v2.9.3` after the Update Manager step above.

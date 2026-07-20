@@ -10,6 +10,7 @@ Employee Time & Attendance date-range register.
 - Added a daily register table showing date, weekday, shift/timetable, check-in, check-out, late-by and status for every working day in the range, including absent days.
 - Late and early-leave figures are measured against the configured company start and close times, matching the biometric "Late Come" reports.
 - Public holidays are detected and excluded from late/absent counts.
+- Added an in-app Update Manager step at `/updates/v2-9-3` that clears the compiled views/cache, updates the platform version and re-syncs System Administrator permissions.
 - No database migration required.
 
 ## v2.8.0 Foreign Key Hotfix

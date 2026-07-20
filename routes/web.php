@@ -213,6 +213,13 @@ Route::middleware([EnsureInstalled::class])->group(function () {
             ->middleware(CheckPermission::class . ':settings.manage')
             ->name('updates.v2_6_11.apply');
 
+        Route::get('/updates/v2-9-3', [UpdateController::class, 'v293'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_9_3');
+        Route::post('/updates/v2-9-3', [UpdateController::class, 'applyV293'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('updates.v2_9_3.apply');
+
         Route::get('/profile', [ProfileController::class, 'show'])
             ->middleware(CheckPermission::class . ':profile.view')
             ->name('profile.show');
