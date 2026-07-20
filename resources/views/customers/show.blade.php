@@ -243,30 +243,30 @@
 .customer-hero h2{margin:0 0 4px}
 .customer-layout{display:grid;grid-template-columns:1.4fr .6fr;gap:16px}
 .detail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:10px}
-.detail-grid div{border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.035);padding:10px 12px}
+.detail-grid div{border:1px solid var(--line);border-radius:14px;background:rgba(15,23,42,.03);padding:10px 12px}
 .detail-grid span{display:block;color:var(--muted);font-size:12px}
 .detail-grid strong{display:block;margin-top:4px;font-weight:600;word-break:break-word}
 .snapshot-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-.snapshot-grid div,.mini-card{border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.035);padding:14px}
+.snapshot-grid div,.mini-card{border:1px solid var(--line);border-radius:18px;background:rgba(15,23,42,.03);padding:14px}
 .snapshot-grid span{display:block;color:var(--muted);font-size:12px}
 .snapshot-grid strong{display:block;margin-top:4px;font-size:22px;word-break:break-word}
 .mini-grid{display:grid;gap:12px;margin-top:12px}
 .mini-card h3{margin:0 0 6px}
 .site-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 .contact-lines{display:grid;gap:5px;color:var(--muted);font-size:13px;margin:10px 0}
-.visual-form{border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.035);padding:14px;margin-top:8px}
+.visual-form{border:1px solid var(--line);border-radius:18px;background:rgba(15,23,42,.03);padding:14px;margin-top:8px}
 .compact-form{margin-top:12px}
 .site-contacts{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
 .site-contacts h4{margin:0 0 10px}
-.contact-chip{display:grid;grid-template-columns:1fr auto;gap:4px 8px;border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:8px;background:rgba(255,255,255,.035)}
+.contact-chip{display:grid;grid-template-columns:1fr auto;gap:4px 8px;border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:8px;background:rgba(15,23,42,.03)}
 .contact-chip strong{grid-column:1/2}
 .contact-chip span,.contact-chip small{grid-column:1/2;color:var(--muted)}
 .contact-chip form{grid-row:1/4;grid-column:2/3}
 .contact-chip .btn{padding:8px 10px}
 .timeline{display:grid;gap:14px;margin-top:8px}
 .timeline-item{display:grid;grid-template-columns:auto 1fr;gap:12px}
-.timeline-icon{width:38px;height:38px;border-radius:14px;background:rgba(255,255,255,.06);display:grid;place-items:center;font-size:18px}
-.timeline-body{border:1px solid var(--line);border-radius:16px;padding:12px;background:rgba(255,255,255,.03)}
+.timeline-icon{width:38px;height:38px;border-radius:14px;background:rgba(15,23,42,.06);display:grid;place-items:center;font-size:18px}
+.timeline-body{border:1px solid var(--line);border-radius:16px;padding:12px;background:rgba(15,23,42,.025)}
 @media(max-width:1200px){.customer-hero,.customer-layout{grid-template-columns:1fr}}
 @media(max-width:720px){.snapshot-grid,.detail-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}}
 </style>

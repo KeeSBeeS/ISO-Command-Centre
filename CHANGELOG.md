@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.9.1
+
+Platform-wide light UI redesign.
+
+- Replaced the dark command-centre theme with a new light theme across every module (sidebar, topbar, cards, tables, forms, pills, alerts, calendar, dashboard widgets, vehicle tracking maps).
+- Re-tuned text/background contrast for table headers, pills, labels and buttons so they read correctly on light surfaces.
+- Bumped the displayed platform version shown in the footer, including the fallback used before the `system_settings` table exists.
+
 ## v2.8.9
 
 Employee profile crash fix (drift correction, not a new bug).

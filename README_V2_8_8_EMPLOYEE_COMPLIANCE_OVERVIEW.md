@@ -1,4 +1,4 @@
-# ISO Admin Command Framework v2.8.7
+# ISO Admin Command Framework v2.8.8
 
 ## Employee Compliance Overview
 
@@ -24,6 +24,6 @@ Rather than re-adding a dead link, this update builds a real Employee Compliance
 
 Upload the included changed/new files, then run:
 
-`/updates/v2-8-7`
+`/updates/v2-8-8`
 
 This seeds the `employee_compliance.view` permission for existing installs (fresh installs via `/install` already include it). No table changes are made.

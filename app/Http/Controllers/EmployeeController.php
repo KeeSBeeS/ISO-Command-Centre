@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
@@ -73,24 +74,28 @@ class EmployeeController extends Controller
             $userData['must_change_password'] = true;
         }
 
-        $employee = User::create($userData);
+        $employee = DB::transaction(function () use ($request, $data, $userData) {
+            $employee = User::create($userData);
 
-        $employee->profile()->create([
-            'employee_number' => $data['employee_number'] ?? null,
-            'job_title' => $data['job_title'] ?? null,
-            'phone' => $data['phone'] ?? null,
-            'mobile' => $data['mobile'] ?? null,
-            'emergency_contact' => $data['emergency_contact'] ?? null,
-            'started_at' => $data['started_at'] ?? null,
-            'status' => $data['status'],
-            'notes' => $data['notes'] ?? null,
-        ]);
+            $employee->profile()->create([
+                'employee_number' => $data['employee_number'] ?? null,
+                'job_title' => $data['job_title'] ?? null,
+                'phone' => $data['phone'] ?? null,
+                'mobile' => $data['mobile'] ?? null,
+                'emergency_contact' => $data['emergency_contact'] ?? null,
+                'started_at' => $data['started_at'] ?? null,
+                'status' => $data['status'],
+                'notes' => $data['notes'] ?? null,
+            ]);
 
-        $employee->departments()->sync($data['department_ids'] ?? []);
-        $employee->roles()->sync($data['role_ids'] ?? []);
-        if (Schema::hasTable('permission_user') && $request->user() && $request->user()->hasPermission('permissions.manage')) {
-            $employee->directPermissions()->sync($data['direct_permission_ids'] ?? []);
-        }
+            $employee->departments()->sync($data['department_ids'] ?? []);
+            $employee->roles()->sync($data['role_ids'] ?? []);
+            if (Schema::hasTable('permission_user') && $request->user() && $request->user()->hasPermission('permissions.manage')) {
+                $employee->directPermissions()->sync($data['direct_permission_ids'] ?? []);
+            }
+
+            return $employee;
+        });
 
         $emailSent = $this->sendNewUserCredentials($employee, $temporaryPassword);
 
@@ -186,27 +191,29 @@ class EmployeeController extends Controller
             }
         }
 
-        $employee->save();
+        DB::transaction(function () use ($request, $data, $employee) {
+            $employee->save();
 
-        $employee->profile()->updateOrCreate(
-            ['user_id' => $employee->id],
-            [
-                'employee_number' => $data['employee_number'] ?? null,
-                'job_title' => $data['job_title'] ?? null,
-                'phone' => $data['phone'] ?? null,
-                'mobile' => $data['mobile'] ?? null,
-                'emergency_contact' => $data['emergency_contact'] ?? null,
-                'started_at' => $data['started_at'] ?? null,
-                'status' => $data['status'],
-                'notes' => $data['notes'] ?? null,
-            ]
-        );
+            $employee->profile()->updateOrCreate(
+                ['user_id' => $employee->id],
+                [
+                    'employee_number' => $data['employee_number'] ?? null,
+                    'job_title' => $data['job_title'] ?? null,
+                    'phone' => $data['phone'] ?? null,
+                    'mobile' => $data['mobile'] ?? null,
+                    'emergency_contact' => $data['emergency_contact'] ?? null,
+                    'started_at' => $data['started_at'] ?? null,
+                    'status' => $data['status'],
+                    'notes' => $data['notes'] ?? null,
+                ]
+            );
 
-        $employee->departments()->sync($data['department_ids'] ?? []);
-        $employee->roles()->sync($data['role_ids'] ?? []);
-        if (Schema::hasTable('permission_user') && $request->user() && $request->user()->hasPermission('permissions.manage')) {
-            $employee->directPermissions()->sync($data['direct_permission_ids'] ?? []);
-        }
+            $employee->departments()->sync($data['department_ids'] ?? []);
+            $employee->roles()->sync($data['role_ids'] ?? []);
+            if (Schema::hasTable('permission_user') && $request->user() && $request->user()->hasPermission('permissions.manage')) {
+                $employee->directPermissions()->sync($data['direct_permission_ids'] ?? []);
+            }
+        });
 
         if ($newPassword) {
             $emailSent = $this->sendNewUserCredentials($employee, $newPassword, true);

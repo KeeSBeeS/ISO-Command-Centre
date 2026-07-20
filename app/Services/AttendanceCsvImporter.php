@@ -6,6 +6,7 @@ use App\Models\AttendanceDay;
 use App\Models\AttendanceImport;
 use App\Models\AttendanceRawRecord;
 use App\Models\PublicHoliday;
+use App\Models\SystemSetting;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
@@ -715,7 +716,8 @@ class AttendanceCsvImporter
             return;
         }
 
-        $cutoff = Carbon::parse($date . ' 09:00:00');
+        $cutoffTime = $this->clockInCutoffTime();
+        $cutoff = Carbon::parse($date . ' ' . $cutoffTime . ':00');
         $publicHoliday = $this->publicHolidayFor($date);
         $isPublicHoliday = (bool) $publicHoliday;
 
@@ -723,8 +725,9 @@ class AttendanceCsvImporter
             return $record->recorded_at && $record->recorded_at->lte($cutoff);
         })->values();
 
-        // Clock-in is only accepted until 09:00. If there are multiple records before 09:00,
-        // only the earliest one becomes the clock-in. If none exist before 09:00, the earliest
+        // Clock-in is only accepted until the configured cut-off (Core Settings > Attendance
+        // Clock-in Cut-off, default 09:00). If there are multiple records before the cut-off,
+        // only the earliest one becomes the clock-in. If none exist before the cut-off, the earliest
         // available record becomes the late clock-in and the day is flagged.
         $first = $recordsBeforeCutoff->isNotEmpty() ? $recordsBeforeCutoff->first() : $records->first();
         $last = $records->last();
@@ -756,7 +759,7 @@ class AttendanceCsvImporter
             $anomalies[] = 'Public holiday / company closed: ' . $publicHoliday->name . '. Attendance is retained for audit only.';
         }
         if ($recordsBeforeCutoff->count() > 1) {
-            $anomalies[] = 'Multiple clock-ins before 09:00; earliest time kept as check-in.';
+            $anomalies[] = "Multiple clock-ins before {$cutoffTime}; earliest time kept as check-in.";
         }
         if ($records->count() === 1) {
             $anomalies[] = 'Only one attendance record found for this day; checkout could not be calculated.';
@@ -765,7 +768,7 @@ class AttendanceCsvImporter
             $anomalies[] = 'Clock-in and checkout time were the same; checkout was left blank.';
         }
         if ($isLate) {
-            $anomalies[] = 'Late clock-in after 09:00.';
+            $anomalies[] = "Late clock-in after {$cutoffTime}.";
         }
 
         $payload = [
@@ -793,6 +796,19 @@ class AttendanceCsvImporter
             ['user_id' => $userId, 'attendance_date' => $date],
             $payload
         );
+    }
+
+    private function clockInCutoffTime(): string
+    {
+        $default = '09:00';
+
+        if (!Schema::hasTable('system_settings')) {
+            return $default;
+        }
+
+        $value = trim((string) SystemSetting::valueFor('attendance_clock_in_cutoff', $default));
+
+        return preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $value) ? $value : $default;
     }
 
     private function publicHolidayFor(string $date): ?PublicHoliday

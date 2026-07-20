@@ -154,6 +154,8 @@ class VehicleTrackingController extends Controller
 
     public function cron(string $key, CartrackFleetApiService $cartrack)
     {
+        abort_unless(Schema::hasTable('system_settings'), 503, 'Run the v2.5.3 update first.');
+
         $expected = (string) SystemSetting::valueFor('cartrack_cron_key', '');
         abort_unless($expected !== '' && hash_equals($expected, $key), 403);
 

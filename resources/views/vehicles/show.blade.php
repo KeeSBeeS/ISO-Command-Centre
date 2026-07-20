@@ -251,7 +251,7 @@
 
 @if(($googleMaps['enabled'] ?? false) && auth()->user()->hasPermission('vehicle_tracking.view') && $trackingHistory->count())
 <style>
-    .tracking-map{height:520px;min-height:55vh;border-radius:20px;border:1px solid var(--line);overflow:hidden;background:#0a1720;box-shadow:var(--shadow-soft);margin-top:12px}
+    .tracking-map{height:520px;min-height:55vh;border-radius:20px;border:1px solid var(--line);overflow:hidden;background:#e9edf1;box-shadow:var(--shadow-soft);margin-top:12px}
     @@media(max-width:720px){.tracking-map{height:430px;min-height:50vh}}
 </style>
 <script>
