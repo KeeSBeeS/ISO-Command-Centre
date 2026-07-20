@@ -55,7 +55,7 @@ class EmployeeController extends Controller
     public function store(Request $request)
     {
         $data = $this->validated($request);
-        $temporaryPassword = $data['password'] ?: $this->generatePassword();
+        $temporaryPassword = ($data['password'] ?? null) ?: $this->generatePassword();
 
         $userData = [
             'name' => $data['name'],
