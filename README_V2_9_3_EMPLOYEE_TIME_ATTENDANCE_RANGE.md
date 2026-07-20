@@ -43,53 +43,63 @@ The section is visible to users with `attendance.view` or `attendance.late.view`
 
 No database migration is required. The register is built from the attendance data that is already imported.
 
-## Changed / new files (upload these to the SAME paths on your server)
+## IMPORTANT: this is an ADDITIVE install — do NOT overwrite whole files
 
-- `app/Http/Controllers/EmployeeController.php` (changed — the feature)
-- `resources/views/employees/show.blade.php` (changed — the feature)
-- `app/Http/Controllers/UpdateController.php` (changed — adds the v2.9.3 apply step)
-- `routes/web.php` (changed — adds the `/updates/v2-9-3` route)
-- `resources/views/updates/v2_9_3.blade.php` (new — the Update Manager page)
-- `VERSION`
+This package is designed to add the feature WITHOUT overwriting any existing
+file that your live site may have a newer version of. Overwriting whole files
+such as `routes/web.php` from an older package is what removes routes like
+`employee_compliance.index` and takes the site down. So:
 
-The zip mirrors your project's folder layout. Extract it INTO your project root
-so `app/...`, `routes/...` and `resources/...` merge with your existing folders.
-Do **not** upload a wrapper folder — the files must land at, for example,
-`app/Http/Controllers/EmployeeController.php`, overwriting the existing file.
+- **Copy in the NEW files** (they overwrite nothing):
+  - `app/Support/EmployeeAttendanceOverview.php`
+  - `resources/views/employees/_time_attendance.blade.php`
+  - `resources/views/updates/v2_9_3.blade.php`
+- **Make three small ADDITIVE edits** to existing files (see `SNIPPETS.txt`).
 
-## Apply with the Update Manager (recommended)
+Do NOT upload the zip's copies of `routes/web.php`, `UpdateController.php`,
+`EmployeeController.php` or `show.blade.php` over your live files.
 
-After the files are uploaded, open:
+### Step 1 — Copy the three new files
 
-`/updates/v2-9-3`
+Upload the three new files above to the same paths on your server. They are
+brand new, so nothing is overwritten.
 
-and click **Apply v2.9.3**. This runs the same way as the other versioned
-updates in this platform. Applying it will:
+### Step 2 — Add one line to the employee profile view
 
-- Clear the compiled views and application cache (so the new employee page
-  shows immediately instead of the old cached one).
-- Update the stored platform version to `2.9.3`.
-- Re-sync System Administrator permissions.
+In `resources/views/employees/show.blade.php`, add this line where you want the
+section to appear (a good spot is just after the top profile / departments /
+roles block):
 
-You need the `settings.manage` permission to open and apply the update.
+```blade
+@include('employees._time_attendance')
+```
 
-## If the page still "looks exactly the same"
+That is the only change the feature itself needs — no controller change. The
+section computes its own data. (Optional: you may delete your old "Late
+Attendance Tracking" block from the same file so it is not shown twice.)
 
-That symptom means the old file is still being served — either the new files
-were uploaded to the wrong folder, or a compiled view / OPcache is stale.
+### Step 3 (optional but recommended) — wire up the Update Manager page
 
-1. Confirm the upload landed: open `resources/views/employees/show.blade.php`
-   on the server and search for `Time & Attendance`. If that text is missing,
-   the file was not overwritten — re-upload it to the correct path.
-2. Apply `/updates/v2-9-3` (it clears the caches for you), or manually:
-   - With SSH: `php artisan view:clear && php artisan cache:clear`
-   - cPanel / FTP only: delete every file inside `storage/framework/views/`
-     (keep the folder), then restart PHP / OPcache.
+So you can apply future cache-clears / version bumps from the UI, add the two
+route lines and the controller methods shown in `SNIPPETS.txt` to your live
+`routes/web.php` and `app/Http/Controllers/UpdateController.php`. These are
+ADD-ONLY — they insert new lines and remove nothing. Then open `/updates/v2-9-3`
+and click **Apply v2.9.3**.
+
+## After installing — clear the view cache once
+
+Because a Blade view changed, clear the compiled views so the new section shows:
+
+- With SSH: `php artisan view:clear`
+- cPanel / FTP only: delete every file inside `storage/framework/views/`
+  (keep the folder), then reload the page.
+
+(Applying `/updates/v2-9-3` does this for you.)
 
 ## How to confirm it worked
 
 1. Open `/employees/{employee}` for someone who has attendance data.
-2. You should now see a **Time & Attendance** card with **Date From / Date To**
-   inputs and an **Apply Date Range** button — the old "Late Attendance
-   Tracking" panel is gone.
-3. The footer version reads `v2.9.3` after the Update Manager step above.
+2. You should see a **Time & Attendance** card with **Date From / Date To**
+   inputs and an **Apply Date Range** button.
+3. Every other page (including Compliance Overview) still works, because no
+   existing file was overwritten.

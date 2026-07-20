@@ -11,6 +11,7 @@ Employee Time & Attendance date-range register.
 - Late and early-leave figures are measured against the configured company start and close times, matching the biometric "Late Come" reports.
 - Public holidays are detected and excluded from late/absent counts.
 - Added an in-app Update Manager step at `/updates/v2-9-3` that clears the compiled views/cache, updates the platform version and re-syncs System Administrator permissions.
+- Packaged as an additive install: a new `App\Support\EmployeeAttendanceOverview` helper and a self-contained `employees._time_attendance` partial, added to the profile page with a single `@include` and no controller changes, so no existing file is overwritten.
 - No database migration required.
 
 ## v2.8.0 Foreign Key Hotfix
