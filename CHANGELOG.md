@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.8.6
+
+Employee Time & Attendance date-range register.
+
+- Added a selectable date-range filter to the Time & Attendance section on the employee profile page.
+- Range defaults to the most recent four weeks of available data with a one-click reset.
+- Added at-a-glance summary tiles: days present, days absent, late days, total late time, early-leave days, total early leave, working days and public holidays for the selected range.
+- Added a daily register table showing date, weekday, shift/timetable, check-in, check-out, late-by and status for every working day in the range, including absent days.
+- Late and early-leave figures are measured against the configured company start and close times, matching the biometric "Late Come" reports.
+- Public holidays are detected and excluded from late/absent counts.
+- No database migration required.
+
 ## v2.8.0 Foreign Key Hotfix
 
 - Fixed MySQL error `1059 Identifier name is too long` during the v2.8.0 update.
