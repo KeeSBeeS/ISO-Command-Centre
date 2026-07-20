@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.8.6
+## v2.9.3
 
 Employee Time & Attendance date-range register.
 
