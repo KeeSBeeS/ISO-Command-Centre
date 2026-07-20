@@ -80,6 +80,8 @@
             str_starts_with($routeName, 'roles') => '🛡️',
             str_starts_with($routeName, 'calendar') => '📅',
             str_starts_with($routeName, 'leave.') => '🗓️',
+            str_starts_with($routeName, 'leave_allocations') => '📊',
+            str_starts_with($routeName, 'sick_leave') => '🤒',
             str_starts_with($routeName, 'attendance') => '⏱️',
             str_starts_with($routeName, 'employee_documents') => '📄',
             str_starts_with($routeName, 'vehicle_tracking') => '🛰️',
@@ -132,6 +134,12 @@
                 @endif
                 @if($currentUser->hasPermission('attendance.view') && \Illuminate\Support\Facades\Schema::hasTable('attendance_days'))
                     <a href="{{ route('attendance.index') }}" class="{{ request()->routeIs('attendance.*') ? 'active' : '' }}"><span class="nav-icon">⏱️</span><span class="nav-text"><strong>Time Attendance</strong><span>Check-ins and imports</span></span></a>
+                @endif
+                @if($currentUser->hasPermission('leave_allocations.view') && \Illuminate\Support\Facades\Schema::hasTable('employee_leave_allocations'))
+                    <a href="{{ route('leave_allocations.index') }}" class="{{ request()->routeIs('leave_allocations.*') ? 'active' : '' }}"><span class="nav-icon">📊</span><span class="nav-text"><strong>Leave Allocations</strong><span>Annual leave days</span></span></a>
+                @endif
+                @if($currentUser->hasPermission('sick_leave.view') && \Illuminate\Support\Facades\Schema::hasTable('employee_sick_records'))
+                    <a href="{{ route('sick_leave.index') }}" class="{{ request()->routeIs('sick_leave.*') ? 'active' : '' }}"><span class="nav-icon">🤒</span><span class="nav-text"><strong>Sick Leave</strong><span>36-month cycles</span></span></a>
                 @endif
                 @if($currentUser->hasPermission('vehicle.view') && \Illuminate\Support\Facades\Schema::hasTable('vehicles'))
                     <a href="{{ route('vehicles.index') }}" class="{{ request()->routeIs('vehicles.*') ? 'active' : '' }}"><span class="nav-icon">🚗</span><span class="nav-text"><strong>Vehicles & Fuel</strong><span>Fleet, fuel and service</span></span></a>

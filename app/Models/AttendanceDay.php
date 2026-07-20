@@ -18,6 +18,9 @@ class AttendanceDay extends Model
         'work_minutes',
         'is_late',
         'late_minutes',
+        'is_early_leave',
+        'early_leave_minutes',
+        'is_weekend',
         'is_public_holiday',
         'public_holiday_name',
         'attendance_import_id',
@@ -33,6 +36,9 @@ class AttendanceDay extends Model
         'work_minutes' => 'integer',
         'is_late' => 'boolean',
         'late_minutes' => 'integer',
+        'is_early_leave' => 'boolean',
+        'early_leave_minutes' => 'integer',
+        'is_weekend' => 'boolean',
         'is_public_holiday' => 'boolean',
     ];
 
@@ -81,9 +87,44 @@ class AttendanceDay extends Model
             : sprintf('Late by %d min', $remaining);
     }
 
+    public function getEarlyLeaveLabelAttribute(): string
+    {
+        if (!$this->is_early_leave) {
+            return 'Full day';
+        }
+
+        $minutes = (int) $this->early_leave_minutes;
+        $hours = intdiv($minutes, 60);
+        $remaining = $minutes % 60;
+
+        return $hours > 0
+            ? sprintf('Early by %dh %02dm', $hours, $remaining)
+            : sprintf('Early by %d min', $remaining);
+    }
+
+    public function getIsMissingCheckoutAttribute(): bool
+    {
+        return $this->start_time !== null && $this->end_time === null;
+    }
+
+    public function getIsNonWorkingDayAttribute(): bool
+    {
+        return (bool) ($this->is_public_holiday || $this->is_weekend);
+    }
+
     public function scopeLate($query)
     {
         return $query->where('is_late', true);
+    }
+
+    public function scopeEarlyLeave($query)
+    {
+        return $query->where('is_early_leave', true);
+    }
+
+    public function scopeMissingCheckout($query)
+    {
+        return $query->whereNotNull('start_time')->whereNull('end_time');
     }
 
     public function scopeWorkingDays($query)
