@@ -2040,6 +2040,120 @@ class UpdateController extends Controller
         return redirect()->route('updates.v2_6_11')->with('success', 'Version 2.6.11 applied. Attendance CSV import compatibility restored, attendance index defaults to the latest imported day, and existing raw records rebuilt: ' . $rebuilt . '.');
     }
 
+    public function v290()
+    {
+        $systemVersion = Schema::hasTable('system_settings')
+            ? DB::table('system_settings')->where('key', 'platform_version')->value('value')
+            : null;
+        $settingsSeeded = Schema::hasTable('system_settings')
+            && DB::table('system_settings')->where('group', 'Update Manager')->exists();
+        $permissionCount = Permission::whereIn('slug', [
+            'platform_updates.view',
+            'platform_updates.manage',
+        ])->count();
+        $zipAvailable = class_exists(\ZipArchive::class);
+
+        return view('updates.v2_9_0', compact('systemVersion', 'settingsSeeded', 'permissionCount', 'zipAvailable'));
+    }
+
+    public function applyV290(Request $request)
+    {
+        $this->seedV290UpdateManagerSettings();
+        $this->seedV290Permissions();
+        $this->seedV290Version();
+        $this->seedSystemAdministratorAllPermissions($request->user());
+
+        return redirect()->route('updates.v2_9_0')->with('success', 'Version 2.9.0 applied. The Update Manager is now available under the Admin menu for System Administrators, supporting ZIP upload updates and GitHub branch updates with pre-apply code backups.');
+    }
+
+    private function seedV290UpdateManagerSettings(): void
+    {
+        if (!Schema::hasTable('system_settings')) {
+            $this->addCoreSettingsTable();
+        }
+
+        $settings = [
+            ['key' => 'update_github_repository', 'label' => 'GitHub Repository', 'value' => null, 'type' => 'text', 'description' => 'GitHub repository in owner/repository format used for web updates.', 'sort_order' => 10],
+            ['key' => 'update_github_branch', 'label' => 'GitHub Branch', 'value' => 'main', 'type' => 'text', 'description' => 'Branch downloaded when updating from GitHub.', 'sort_order' => 20],
+            ['key' => 'update_github_token', 'label' => 'GitHub Access Token', 'value' => null, 'type' => 'password', 'description' => 'Optional token used to download private repositories. Stored server-side only.', 'sort_order' => 30],
+            ['key' => 'update_backup_before_apply', 'label' => 'Backup Before Apply', 'value' => '1', 'type' => 'boolean', 'description' => 'Creates a code backup ZIP before applying an update package.', 'sort_order' => 40],
+        ];
+
+        foreach ($settings as $setting) {
+            $payload = [
+                'group' => 'Update Manager',
+                'label' => $setting['label'],
+                'type' => $setting['type'],
+                'description' => $setting['description'],
+                'sort_order' => $setting['sort_order'],
+                'is_core' => true,
+                'updated_at' => now(),
+            ];
+
+            if (DB::table('system_settings')->where('key', $setting['key'])->exists()) {
+                DB::table('system_settings')->where('key', $setting['key'])->update($payload);
+            } else {
+                DB::table('system_settings')->insert(array_merge($payload, [
+                    'key' => $setting['key'],
+                    'value' => $setting['value'],
+                    'created_at' => now(),
+                ]));
+            }
+        }
+    }
+
+    private function seedV290Permissions(): void
+    {
+        $permissions = [
+            [
+                'slug' => 'platform_updates.view',
+                'name' => 'View Update Manager',
+                'module' => 'System Settings',
+                'description' => 'View the Update Manager, update packages and code backups. System Administrator only.',
+            ],
+            [
+                'slug' => 'platform_updates.manage',
+                'name' => 'Manage Platform Updates',
+                'module' => 'System Settings',
+                'description' => 'Upload, download and apply platform update packages. System Administrator only.',
+            ],
+        ];
+
+        $permissionIds = [];
+        foreach ($permissions as $permission) {
+            $record = Permission::updateOrCreate(['slug' => $permission['slug']], $permission);
+            $permissionIds[] = $record->id;
+        }
+
+        if ($systemAdministrator = Role::where('slug', 'system-administrator')->first()) {
+            $systemAdministrator->permissions()->syncWithoutDetaching($permissionIds);
+        }
+
+        Role::whereIn('slug', ['director', 'manager', 'employee'])->get()->each(function (Role $role) use ($permissionIds) {
+            $role->permissions()->detach($permissionIds);
+        });
+    }
+
+    private function seedV290Version(): void
+    {
+        if (Schema::hasTable('system_settings')) {
+            DB::table('system_settings')->updateOrInsert(
+                ['key' => 'platform_version'],
+                [
+                    'group' => 'Identity',
+                    'label' => 'Platform Version',
+                    'value' => '2.9.0',
+                    'type' => 'text',
+                    'description' => 'Current ISO Admin Command Framework package version.',
+                    'sort_order' => 5,
+                    'is_core' => true,
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+        }
+    }
+
     private function seedV2611Version(): void
     {
         if (Schema::hasTable('system_settings')) {
