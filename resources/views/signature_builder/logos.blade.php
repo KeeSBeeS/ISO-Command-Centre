@@ -16,14 +16,19 @@
     .siglogo-badge.off{background:rgba(255,255,255,.05);color:var(--muted)}
     .siglogo-order{display:flex;gap:6px}
     .siglogo-order .btn{padding:7px 10px}
+    .siglogo-company{width:100%;max-width:260px;height:96px;border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center;padding:12px;border:1px solid var(--line)}
+    .siglogo-company img{max-width:100%;max-height:72px;object-fit:contain}
+    .siglogo-company span{color:#3a5052;font-weight:800;font-size:14px;font-family:Arial,Helvetica,sans-serif;text-align:center}
+    .siglogo-bg{width:100%;aspect-ratio:2/1;max-height:170px;border-radius:14px;border:1px solid var(--line);background:#0d1b24 center/cover no-repeat}
+    .siglogo-asset{display:grid;gap:12px;align-content:start}
 </style>
 
 <div class="page-head">
     <div class="page-head-main">
         <div class="page-head-icon">🏷️</div>
         <div>
-            <h2>Signature Brand Logos</h2>
-            <p>Manage the "Our Brands &amp; Technology Partners" logos shown in every email signature. Logos appear in the order listed, four per row.</p>
+            <h2>Signature Logos &amp; Background</h2>
+            <p>Manage the official company logo, the signature background and the "Our Brands &amp; Technology Partners" logos shown in every email signature. Partner logos appear in the order listed, four per row.</p>
         </div>
     </div>
     <div class="actions">
@@ -35,6 +40,52 @@
     Uploaded logos are stored on this server and linked from the signature, so recipients' email clients load them from <strong>{{ request()->getHost() }}</strong>.
     For the cleanest result use a wide PNG with a transparent or white background (around 260 × 84 px). Logos without an image show the brand name as text.
 </div>
+
+<div class="grid cols-2">
+    <div class="card siglogo-asset">
+        <h2>Company logo</h2>
+        <div class="siglogo-company">
+            @if($companyLogo)
+                <img src="{{ $companyLogo }}" alt="ISO-Reliability Partners logo">
+            @else
+                <span>No logo uploaded yet<br><small style="font-weight:600">Signatures show "ISO-Reliability Partners" as text</small></span>
+            @endif
+        </div>
+        <p class="muted small">Upload the official ISO-Reliability Partners logo. It sits on a white panel in the signature, so the normal full-colour version works best. PNG with a transparent background, about 400 × 128 px (shown at up to 200 × 64 px). PNG, JPG or GIF · max 2 MB.</p>
+        <form method="post" action="{{ route('signature_builder.company_logo.update') }}" enctype="multipart/form-data" class="siglogo-asset">
+            @csrf
+            <input type="file" name="company_logo" accept=".png,.jpg,.jpeg,.gif,image/png,image/jpeg,image/gif" required>
+            <div class="actions"><button class="btn primary" type="submit">{{ $companyLogo ? 'Replace Company Logo' : 'Upload Company Logo' }}</button></div>
+        </form>
+        @if($companyLogo)
+            <form method="post" action="{{ route('signature_builder.company_logo.destroy') }}" onsubmit="return confirm('Remove the company logo? Signatures already sent will no longer show it.')">
+                @csrf
+                @method('DELETE')
+                <button class="btn danger" type="submit">Remove Company Logo</button>
+            </form>
+        @endif
+    </div>
+
+    <div class="card siglogo-asset">
+        <h2>Signature background</h2>
+        <div class="siglogo-bg" style="background-image:url('{{ $background }}')" role="img" aria-label="Current signature background"></div>
+        <p class="muted small">{{ $customBackground ? 'Using your uploaded background.' : 'Using the default ISO-Reliability background artwork.' }} To use your own, upload a JPG at 1280 px wide (2× the 640 px signature) with no text in the image. Keep it under 150 KB so emails load fast. JPG or PNG · max 1 MB.</p>
+        <form method="post" action="{{ route('signature_builder.background.update') }}" enctype="multipart/form-data" class="siglogo-asset">
+            @csrf
+            <input type="file" name="background" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
+            <div class="actions"><button class="btn primary" type="submit">Upload Background</button></div>
+        </form>
+        @if($customBackground)
+            <form method="post" action="{{ route('signature_builder.background.reset') }}" onsubmit="return confirm('Go back to the default background? Signatures already sent with your custom background will no longer show it.')">
+                @csrf
+                @method('DELETE')
+                <button class="btn" type="submit">Reset to Default Background</button>
+            </form>
+        @endif
+    </div>
+</div>
+
+<div style="height:16px"></div>
 
 <div class="card">
     <h2>Add a logo</h2>
@@ -52,7 +103,7 @@
             <div class="form-row">
                 <label>Upload logo image</label>
                 <input type="file" name="image" accept=".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp">
-                <p class="muted small">PNG, JPG, GIF or WebP · max 2 MB.</p>
+                <p class="muted small">PNG, JPG, GIF or WebP · max 2 MB. PNG or JPG recommended: Outlook for Windows cannot show WebP.</p>
             </div>
             <div class="form-row">
                 <label>…or use an existing image URL</label>

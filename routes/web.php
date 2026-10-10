@@ -228,6 +228,18 @@ Route::middleware([EnsureInstalled::class])->group(function () {
         Route::get('/signature-builder', [SignatureBuilderController::class, 'index'])
             ->middleware(CheckPermission::class . ':settings.manage')
             ->name('signature_builder.index');
+        Route::post('/signature-builder/company-logo', [SignatureBuilderController::class, 'updateCompanyLogo'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('signature_builder.company_logo.update');
+        Route::delete('/signature-builder/company-logo', [SignatureBuilderController::class, 'destroyCompanyLogo'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('signature_builder.company_logo.destroy');
+        Route::post('/signature-builder/background', [SignatureBuilderController::class, 'updateBackground'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('signature_builder.background.update');
+        Route::delete('/signature-builder/background', [SignatureBuilderController::class, 'resetBackground'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('signature_builder.background.reset');
         Route::get('/signature-builder/logos', [SignatureBuilderController::class, 'logos'])
             ->middleware(CheckPermission::class . ':settings.manage')
             ->name('signature_builder.logos');

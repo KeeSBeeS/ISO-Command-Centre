@@ -42,14 +42,64 @@ class SignatureBuilderController extends Controller
             })
             ->values();
 
-        return view('signature_builder.index', compact('logos', 'employees'));
+        $companyLogo = $this->logos->companyLogoSrc();
+        $background = $this->logos->backgroundSrc();
+
+        return view('signature_builder.index', compact('logos', 'employees', 'companyLogo', 'background'));
     }
 
     public function logos()
     {
         $logos = array_map(fn (array $logo) => $logo + ['src' => $this->logos->imageSrc($logo)], $this->logos->all());
+        $companyLogo = $this->logos->companyLogoSrc();
+        $background = $this->logos->backgroundSrc();
+        $customBackground = $this->logos->hasCustomBackground();
 
-        return view('signature_builder.logos', compact('logos'));
+        return view('signature_builder.logos', compact('logos', 'companyLogo', 'background', 'customBackground'));
+    }
+
+    public function updateCompanyLogo(Request $request)
+    {
+        $request->validate([
+            'company_logo' => ['required', 'file', 'mimes:png,jpg,jpeg,gif', 'max:2048'],
+        ], [
+            'company_logo.required' => 'Choose the company logo image to upload.',
+            'company_logo.mimes' => 'The company logo must be a PNG, JPG or GIF file.',
+            'company_logo.max' => 'The company logo may not be larger than 2 MB.',
+        ]);
+
+        $this->logos->setCompanyLogo($request->file('company_logo'));
+
+        return redirect()->route('signature_builder.logos')->with('success', 'Company logo updated.');
+    }
+
+    public function destroyCompanyLogo()
+    {
+        $this->logos->removeCompanyLogo();
+
+        return redirect()->route('signature_builder.logos')->with('success', 'Company logo removed. Signatures show the company name as text until a new logo is uploaded.');
+    }
+
+    public function updateBackground(Request $request)
+    {
+        $request->validate([
+            'background' => ['required', 'file', 'mimes:png,jpg,jpeg', 'max:1024'],
+        ], [
+            'background.required' => 'Choose the background image to upload.',
+            'background.mimes' => 'The background must be a JPG or PNG file.',
+            'background.max' => 'The background may not be larger than 1 MB. Keep it small so emails load quickly.',
+        ]);
+
+        $this->logos->setBackground($request->file('background'));
+
+        return redirect()->route('signature_builder.logos')->with('success', 'Signature background updated.');
+    }
+
+    public function resetBackground()
+    {
+        $this->logos->resetBackground();
+
+        return redirect()->route('signature_builder.logos')->with('success', 'Signature background reset to the default ISO-Reliability artwork.');
     }
 
     public function storeLogo(Request $request)

@@ -7,15 +7,18 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
 /**
- * File-based storage for the email signature brand logos.
+ * File-based storage for the email signature brand logos, company logo and background.
  *
- * Logo records are kept in storage/app/signature-builder/logos.json and uploaded
- * images are saved to public/uploads/signature-logos so that email clients can load
- * them from a public URL. No database tables or migrations are required.
+ * Logo records are kept in storage/app/signature-builder/logos.json, the company logo and
+ * custom background in storage/app/signature-builder/settings.json, and uploaded images are
+ * saved to public/uploads/signature-logos so that email clients can load them from a public
+ * URL. No database tables or migrations are required.
  */
 class SignatureLogoStore
 {
     public const UPLOAD_DIRECTORY = 'uploads/signature-logos';
+
+    public const DEFAULT_BACKGROUND = 'images/signature/iiso-signature-bg.jpg';
 
     private const DEFAULT_LOGOS = [
         ['name' => 'PPL', 'link_url' => 'https://iiso.co.za/'],
@@ -159,11 +162,89 @@ class SignatureLogoStore
      */
     public function imageSrc(array $logo): ?string
     {
-        if (!empty($logo['image_file']) && File::exists(public_path(self::UPLOAD_DIRECTORY . '/' . $logo['image_file']))) {
-            return asset(self::UPLOAD_DIRECTORY . '/' . rawurlencode($logo['image_file']));
+        return $this->uploadedSrc($logo['image_file'] ?? null) ?? (!empty($logo['image_url']) ? $logo['image_url'] : null);
+    }
+
+    /**
+     * Absolute public URL of the uploaded official company logo, or null when none is uploaded.
+     */
+    public function companyLogoSrc(): ?string
+    {
+        return $this->uploadedSrc($this->settings()['company_logo_file'] ?? null);
+    }
+
+    public function setCompanyLogo(UploadedFile $image): void
+    {
+        $settings = $this->settings();
+        $this->deleteImage($settings['company_logo_file'] ?? null);
+        $settings['company_logo_file'] = $this->storeImage($image, 'company-logo');
+        $this->saveSettings($settings);
+    }
+
+    public function removeCompanyLogo(): void
+    {
+        $settings = $this->settings();
+        $this->deleteImage($settings['company_logo_file'] ?? null);
+        $settings['company_logo_file'] = null;
+        $this->saveSettings($settings);
+    }
+
+    /**
+     * Absolute public URL of the signature background: the uploaded custom background, or the default artwork.
+     */
+    public function backgroundSrc(): string
+    {
+        return $this->uploadedSrc($this->settings()['background_file'] ?? null) ?? asset(self::DEFAULT_BACKGROUND);
+    }
+
+    public function hasCustomBackground(): bool
+    {
+        return $this->uploadedSrc($this->settings()['background_file'] ?? null) !== null;
+    }
+
+    public function setBackground(UploadedFile $image): void
+    {
+        $settings = $this->settings();
+        $this->deleteImage($settings['background_file'] ?? null);
+        $settings['background_file'] = $this->storeImage($image, 'signature-background');
+        $this->saveSettings($settings);
+    }
+
+    public function resetBackground(): void
+    {
+        $settings = $this->settings();
+        $this->deleteImage($settings['background_file'] ?? null);
+        $settings['background_file'] = null;
+        $this->saveSettings($settings);
+    }
+
+    private function uploadedSrc(?string $fileName): ?string
+    {
+        if (!$fileName || basename($fileName) !== $fileName || !File::exists(public_path(self::UPLOAD_DIRECTORY . '/' . $fileName))) {
+            return null;
         }
 
-        return !empty($logo['image_url']) ? $logo['image_url'] : null;
+        return asset(self::UPLOAD_DIRECTORY . '/' . rawurlencode($fileName));
+    }
+
+    private function settings(): array
+    {
+        $path = $this->settingsPath();
+        $decoded = File::exists($path) ? json_decode((string) File::get($path), true) : null;
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function saveSettings(array $settings): void
+    {
+        $path = $this->settingsPath();
+        File::ensureDirectoryExists(dirname($path), 0755);
+        File::put($path, json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), true);
+    }
+
+    private function settingsPath(): string
+    {
+        return storage_path('app/signature-builder/settings.json');
     }
 
     private function makeRecord(string $name, ?string $linkUrl, ?string $imageFile, ?string $imageUrl, bool $active, int $sortOrder): array
