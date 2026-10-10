@@ -16,6 +16,7 @@ use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SignatureBuilderController;
 use App\Http\Controllers\UpdateController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\VehicleTrackingController;
@@ -223,6 +224,25 @@ Route::middleware([EnsureInstalled::class])->group(function () {
         Route::post('/cron-jobs/attendance-email-import', [CronJobController::class, 'runAttendanceEmailImport'])
             ->middleware(CheckPermission::class . ':cron_jobs.run')
             ->name('cron_jobs.attendance_email_import');
+
+        Route::get('/signature-builder', [SignatureBuilderController::class, 'index'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('signature_builder.index');
+        Route::get('/signature-builder/logos', [SignatureBuilderController::class, 'logos'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('signature_builder.logos');
+        Route::post('/signature-builder/logos', [SignatureBuilderController::class, 'storeLogo'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('signature_builder.logos.store');
+        Route::put('/signature-builder/logos/{logo}', [SignatureBuilderController::class, 'updateLogo'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('signature_builder.logos.update');
+        Route::post('/signature-builder/logos/{logo}/move', [SignatureBuilderController::class, 'moveLogo'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('signature_builder.logos.move');
+        Route::delete('/signature-builder/logos/{logo}', [SignatureBuilderController::class, 'destroyLogo'])
+            ->middleware(CheckPermission::class . ':settings.manage')
+            ->name('signature_builder.logos.destroy');
 
         Route::get('/settings/core', [CoreSettingController::class, 'index'])
             ->middleware(CheckPermission::class . ':core_settings.view')

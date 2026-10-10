@@ -85,6 +85,7 @@
             str_starts_with($routeName, 'vehicle_tracking') => '🛰️',
             str_starts_with($routeName, 'vehicles') => '🚗',
             str_starts_with($routeName, 'cron_jobs') => '⚙️',
+            str_starts_with($routeName, 'signature_builder') => '✉️',
             str_starts_with($routeName, 'vehicle_tracking.settings') => '🛰️',
             str_starts_with($routeName, 'google_api_settings') => '🗺️',
             str_starts_with($routeName, 'core_settings') => '🔧',
@@ -146,6 +147,9 @@
                 <div class="nav-section-label">Admin</div>
                 @if($currentUser->hasPermission('cron_jobs.view'))
                     <a href="{{ route('cron_jobs.index') }}" class="{{ request()->routeIs('cron_jobs.*') ? 'active' : '' }}"><span class="nav-icon">⚙️</span><span class="nav-text"><strong>Cron Jobs</strong><span>Automation tasks</span></span></a>
+                @endif
+                @if($currentUser->hasPermission('settings.manage'))
+                    <a href="{{ route('signature_builder.index') }}" class="{{ request()->routeIs('signature_builder.*') ? 'active' : '' }}"><span class="nav-icon">✉️</span><span class="nav-text"><strong>Signature Builder</strong><span>Email signatures and logos</span></span></a>
                 @endif
                 @if($currentUser->hasAnyPermission(['core_settings.view','google_api_settings.view','vehicle_tracking.settings.view','leave_types.view','settings.manage']))
                     @if($currentUser->hasRole('system-administrator') && $currentUser->hasPermission('core_settings.view') && \Illuminate\Support\Facades\Schema::hasTable('system_settings'))

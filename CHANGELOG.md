@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.9.0
+
+Email signature builder and signature logo manager.
+
+- Added **Signature Builder** under the Admin menu (`/signature-builder`), based on the ISO-Reliability Partners signature template.
+- Employee details can be loaded from an existing employee record or typed manually.
+- Copy the formatted signature to the clipboard or download a personalised HTML file.
+- Added **Manage Logos** (`/signature-builder/logos`) to add, edit, reorder, hide and delete the brand logos in the signature.
+- Logos can be uploaded (PNG, JPG, GIF, WebP, max 2 MB) or linked from an existing https:// image URL. Logos without an image show the brand name as text.
+- Logos are laid out four per row and scaled to fit the logo box with exact width/height attributes for Outlook.
+- No database update is required. Logo records are stored in `storage/app/signature-builder/logos.json` and uploads in `public/uploads/signature-logos/`.
+- Access uses the existing `settings.manage` permission (System Administrator always has access).
+
 ## v2.8.0 Foreign Key Hotfix
 
 - Fixed MySQL error `1059 Identifier name is too long` during the v2.8.0 update.
