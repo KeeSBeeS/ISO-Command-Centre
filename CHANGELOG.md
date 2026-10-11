@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.9.1
+
+Email signature redesign.
+
+- New branded signature design: deep-teal band with filtration artwork (hex filter mesh catching contaminant particles, clean oil flowing past) behind live HTML name, title and contact details; white partner-logo grid; amber-to-green "contaminated → clean oil" accent stripe.
+- Replaced the incorrect "ISO." text logo with a company-logo tab for the official logo, uploaded under Manage Logos (falls back to the text "ISO-Reliability Partners").
+- Added optional custom signature background upload with reset to the default artwork (`public/images/signature/iiso-signature-bg.jpg`).
+- Background degrades to a solid #0D4B4A band in Gmail and the Outlook signature editors; "Preview without background image" shows that view.
+- Copy produces a lean Gmail-safe version; Download produces a full version with Outlook (VML) background code for classic Outlook .htm signature files.
+- Signature size indicator against Gmail's 10,000-character limit; long names, titles and emails adapt automatically.
+- Editable artwork source in `resources/signature/`.
+
 ## v2.9.0
 
 Email signature builder and signature logo manager.
