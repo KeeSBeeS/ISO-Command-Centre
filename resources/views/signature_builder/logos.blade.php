@@ -19,7 +19,7 @@
     .siglogo-company{width:100%;max-width:260px;height:96px;border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center;padding:12px;border:1px solid var(--line)}
     .siglogo-company img{max-width:100%;max-height:72px;object-fit:contain}
     .siglogo-company span{color:#3a5052;font-weight:800;font-size:14px;font-family:Arial,Helvetica,sans-serif;text-align:center}
-    .siglogo-bg{width:100%;aspect-ratio:2/1;max-height:170px;border-radius:14px;border:1px solid var(--line);background:#0d1b24 center/cover no-repeat}
+    .siglogo-bg{width:100%;aspect-ratio:640/132;border-radius:14px;border:1px solid var(--line);background:#0D4B4A left top/100% auto no-repeat}
     .siglogo-asset{display:grid;gap:12px;align-content:start}
 </style>
 
@@ -69,7 +69,7 @@
     <div class="card siglogo-asset">
         <h2>Signature background</h2>
         <div class="siglogo-bg" style="background-image:url('{{ $background }}')" role="img" aria-label="Current signature background"></div>
-        <p class="muted small">{{ $customBackground ? 'Using your uploaded background.' : 'Using the default ISO-Reliability background artwork.' }} To use your own, upload a JPG at 1280 px wide (2× the 640 px signature) with no text in the image. Keep it under 150 KB so emails load fast. JPG or PNG · max 1 MB.</p>
+        <p class="muted small">{{ $customBackground ? 'Using your uploaded background.' : 'Using the default ISO-Reliability background artwork.' }} To use your own, upload a JPG of 1280 × 264 px (2× the 640 × 132 px band behind the name and contact details) with no text in the image. Fade its left and bottom edges to the band colour #0D4B4A (the band grows downward for long titles) and keep the left 1150 px dark and calm behind the text. The default artwork is about 30 KB; keep yours under 150 KB so emails load fast. JPG or PNG · max 1 MB.</p>
         <form method="post" action="{{ route('signature_builder.background.update') }}" enctype="multipart/form-data" class="siglogo-asset">
             @csrf
             <input type="file" name="background" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
