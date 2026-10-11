@@ -9,7 +9,12 @@ Email signature redesign.
 - Added optional custom signature background upload with reset to the default artwork (`public/images/signature/iiso-signature-bg.jpg`).
 - Background degrades to a solid #0D4B4A band in Gmail and the Outlook signature editors; "Preview without background image" shows that view.
 - Copy produces a lean Gmail-safe version; Download produces a full version with Outlook (VML) background code for classic Outlook .htm signature files.
-- Signature size indicator against Gmail's 10,000-character limit; long names, titles and emails adapt automatically.
+- Signature size indicator against Gmail's 10,000-character limit, counted as Gmail stores the markup, with a warning from 9,700 characters; long names, titles and emails adapt automatically.
+- Empty job title, mobile or email lines are left out of the signature instead of showing placeholders; Copy and Download need the full name.
+- Phone links drop a "(0)" trunk prefix and convert 0xx numbers to +27; invalid email addresses are shown unlinked and flagged instead of linking to info@.
+- Replacing the company logo, background or a partner logo keeps the old file, so emails already sent keep their images. Data files are written atomically, and a damaged data file is refused instead of being overwritten.
+- Custom backgrounds must match the band shape (about 4.85 : 1, at least 640 × 132 px).
+- Builder preview scales to fit narrow screens and comes first on tablets and phones; Manage Logos shows one card per logo on narrow screens; a failed logo edit stays in its own form.
 - Editable artwork source in `resources/signature/`.
 
 ## v2.9.0

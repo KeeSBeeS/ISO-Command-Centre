@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\SignatureLogoStore;
+use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
 
 class SignatureBuilderController extends Controller
@@ -83,7 +85,7 @@ class SignatureBuilderController extends Controller
     public function updateBackground(Request $request)
     {
         $request->validate([
-            'background' => ['required', 'file', 'mimes:png,jpg,jpeg', 'max:1024'],
+            'background' => ['bail', 'required', 'file', 'mimes:png,jpg,jpeg', 'max:1024', $this->backgroundShapeRule()],
         ], [
             'background.required' => 'Choose the background image to upload.',
             'background.mimes' => 'The background must be a JPG or PNG file.',
@@ -93,6 +95,29 @@ class SignatureBuilderController extends Controller
         $this->logos->setBackground($request->file('background'));
 
         return redirect()->route('signature_builder.logos')->with('success', 'Signature background updated.');
+    }
+
+    /**
+     * Every signature draws the background at 640 × 132 px (CSS background-size and the Outlook VML frame), so an
+     * image of another shape would be stretched. Accept 640 × 132 or larger, within 5% of that 4.85 : 1 shape.
+     */
+    private function backgroundShapeRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail) {
+            $size = $value instanceof UploadedFile ? @getimagesize($value->getRealPath()) : false;
+            if (!$size || empty($size[0]) || empty($size[1])) {
+                $fail('The background could not be read as an image.');
+
+                return;
+            }
+
+            [$width, $height] = $size;
+            if ($width < 640 || $height < 132) {
+                $fail("The background must be at least 640 × 132 px (1280 × 264 px recommended). This image is {$width} × {$height} px.");
+            } elseif (abs(($width / $height) / (640 / 132) - 1) > 0.05) {
+                $fail("The background must have the shape of the signature band, about 4.85 : 1 (for example 1280 × 264 px). This image is {$width} × {$height} px, so every signature would show it stretched.");
+            }
+        };
     }
 
     public function resetBackground()

@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * File-based storage for the email signature brand logos, company logo and background.
@@ -13,6 +14,11 @@ use Illuminate\Support\Str;
  * custom background in storage/app/signature-builder/settings.json, and uploaded images are
  * saved to public/uploads/signature-logos so that email clients can load them from a public
  * URL. No database tables or migrations are required.
+ *
+ * Copied signatures embed absolute URLs to the uploaded images, and emails already sent keep
+ * loading them. Replacing an image therefore keeps the superseded file on the server; only an
+ * explicit Remove / Delete / Reset deletes a file, and only after the JSON record no longer
+ * points to it.
  */
 class SignatureLogoStore
 {
@@ -45,8 +51,7 @@ class SignatureLogoStore
             return $logos;
         }
 
-        $decoded = json_decode((string) File::get($path), true);
-        $logos = is_array($decoded) ? array_values(array_filter($decoded, 'is_array')) : [];
+        $logos = array_values(array_filter($this->readJson($path), 'is_array'));
 
         usort($logos, fn (array $a, array $b) => ($a['sort_order'] ?? 0) <=> ($b['sort_order'] ?? 0));
 
@@ -94,22 +99,23 @@ class SignatureLogoStore
             $logo['link_url'] = $linkUrl;
             $logo['active'] = $active;
 
+            $removedFile = null;
             if ($image) {
-                $this->deleteImage($logo['image_file'] ?? null);
+                // replacing: the superseded file stays, so emails already sent keep their image
                 $logo['image_file'] = $this->storeImage($image, $name);
                 $logo['image_url'] = null;
             } elseif ($removeImage) {
-                $this->deleteImage($logo['image_file'] ?? null);
+                $removedFile = $logo['image_file'] ?? null;
                 $logo['image_file'] = null;
                 $logo['image_url'] = null;
             } elseif ($imageUrl) {
-                $this->deleteImage($logo['image_file'] ?? null);
                 $logo['image_file'] = null;
                 $logo['image_url'] = $imageUrl;
             }
 
             $logo['updated_at'] = now()->toIso8601String();
             $this->save($logos);
+            $this->deleteImage($removedFile);
 
             return true;
         }
@@ -122,10 +128,11 @@ class SignatureLogoStore
         $logos = $this->all();
         $remaining = [];
         $deleted = false;
+        $removedFile = null;
 
         foreach ($logos as $logo) {
             if (($logo['id'] ?? null) === $id) {
-                $this->deleteImage($logo['image_file'] ?? null);
+                $removedFile = $logo['image_file'] ?? null;
                 $deleted = true;
                 continue;
             }
@@ -134,6 +141,7 @@ class SignatureLogoStore
 
         if ($deleted) {
             $this->save($this->renumber($remaining));
+            $this->deleteImage($removedFile);
         }
 
         return $deleted;
@@ -173,20 +181,24 @@ class SignatureLogoStore
         return $this->uploadedSrc($this->settings()['company_logo_file'] ?? null);
     }
 
+    /**
+     * Upload or replace the company logo. A replaced file is kept: emails already sent still load it.
+     */
     public function setCompanyLogo(UploadedFile $image): void
     {
+        $file = $this->storeImage($image, 'company-logo');
         $settings = $this->settings();
-        $this->deleteImage($settings['company_logo_file'] ?? null);
-        $settings['company_logo_file'] = $this->storeImage($image, 'company-logo');
+        $settings['company_logo_file'] = $file;
         $this->saveSettings($settings);
     }
 
     public function removeCompanyLogo(): void
     {
         $settings = $this->settings();
-        $this->deleteImage($settings['company_logo_file'] ?? null);
+        $removedFile = $settings['company_logo_file'] ?? null;
         $settings['company_logo_file'] = null;
         $this->saveSettings($settings);
+        $this->deleteImage($removedFile);
     }
 
     /**
@@ -202,20 +214,24 @@ class SignatureLogoStore
         return $this->uploadedSrc($this->settings()['background_file'] ?? null) !== null;
     }
 
+    /**
+     * Upload or replace the custom background. A replaced file is kept: emails already sent still load it.
+     */
     public function setBackground(UploadedFile $image): void
     {
+        $file = $this->storeImage($image, 'signature-background');
         $settings = $this->settings();
-        $this->deleteImage($settings['background_file'] ?? null);
-        $settings['background_file'] = $this->storeImage($image, 'signature-background');
+        $settings['background_file'] = $file;
         $this->saveSettings($settings);
     }
 
     public function resetBackground(): void
     {
         $settings = $this->settings();
-        $this->deleteImage($settings['background_file'] ?? null);
+        $removedFile = $settings['background_file'] ?? null;
         $settings['background_file'] = null;
         $this->saveSettings($settings);
+        $this->deleteImage($removedFile);
     }
 
     private function uploadedSrc(?string $fileName): ?string
@@ -230,16 +246,56 @@ class SignatureLogoStore
     private function settings(): array
     {
         $path = $this->settingsPath();
-        $decoded = File::exists($path) ? json_decode((string) File::get($path), true) : null;
 
-        return is_array($decoded) ? $decoded : [];
+        return File::exists($path) ? $this->readJson($path) : [];
     }
 
     private function saveSettings(array $settings): void
     {
-        $path = $this->settingsPath();
-        File::ensureDirectoryExists(dirname($path), 0755);
-        File::put($path, json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), true);
+        $this->writeJson($this->settingsPath(), $settings);
+    }
+
+    /**
+     * Decode a JSON data file. An empty file counts as no data, but a file that has content and does not
+     * decode to an array is refused: returning [] would let the next save overwrite every record in it.
+     */
+    private function readJson(string $path): array
+    {
+        // no read lock needed: writeJson() renames a complete file into place, so a reader always gets a whole file
+        $contents = (string) File::get($path);
+        if (trim($contents) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($contents, true);
+        if (!is_array($decoded)) {
+            throw new RuntimeException('The signature builder data file ' . $path . ' could not be read (invalid JSON). Restore it from a backup, or delete it to start again with the default logos.');
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * Write a JSON data file atomically: a temporary file in the same folder is renamed over the old one, so
+     * a reader never sees a half-written file and a failed write leaves the previous version in place.
+     */
+    private function writeJson(string $path, array $data): void
+    {
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $directory = dirname($path);
+        File::ensureDirectoryExists($directory, 0755);
+
+        $temp = tempnam($directory, basename($path) . '.');
+        $written = $temp !== false && file_put_contents($temp, $json) === strlen($json);
+        if ($written) {
+            @chmod($temp, 0644);   // tempnam() creates the file as 0600
+        }
+        if (!$written || !@rename($temp, $path)) {
+            if ($temp !== false && File::exists($temp)) {
+                File::delete($temp);
+            }
+            throw new RuntimeException('Could not save ' . $path . '. Check that storage/app is writable.');
+        }
     }
 
     private function settingsPath(): string
@@ -301,9 +357,7 @@ class SignatureLogoStore
 
     private function save(array $logos): void
     {
-        $path = $this->dataPath();
-        File::ensureDirectoryExists(dirname($path), 0755);
-        File::put($path, json_encode(array_values($logos), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), true);
+        $this->writeJson($this->dataPath(), array_values($logos));
     }
 
     private function dataPath(): string

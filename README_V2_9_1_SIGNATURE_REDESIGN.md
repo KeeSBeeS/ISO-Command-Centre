@@ -10,9 +10,11 @@ This is a changed-files-only update for the Signature Builder added in v2.9.0. I
 - **All text is live HTML** (name, title, mobile, office, email, web, tagline, address). Nothing is baked into the image, so it stays sharp, searchable and clickable.
 - **The wrong "ISO." text logo is gone.** The signature now has a white **company-logo tab** for the official ISO-Reliability Partners logo, which you upload under **Manage Logos**. Until one is uploaded the tab shows "ISO-Reliability Partners" as plain text.
 - **Background image with a safe fallback.** Gmail and the Outlook signature editors strip background images. When that happens the band shows as solid teal (#0D4B4A) with the same layout, and all text stays readable. Tick **"Preview without background image"** in the builder to see exactly how that looks.
-- **Custom background (optional).** Manage Logos → *Signature background* lets you upload your own band artwork (1280 × 264 px JPG) or reset to the default.
+- **Custom background (optional).** Manage Logos → *Signature background* lets you upload your own band artwork (1280 × 264 px JPG) or reset to the default. Images of another shape are refused, because every signature would show them stretched.
 - **Long names, titles and emails adapt automatically.** Long names get a smaller font, long titles wrap, and long email addresses move to their own row, so text never runs into the bright part of the artwork.
-- **Gmail size check.** The builder shows the signature size against Gmail's 10,000-character limit and warns you if a signature would be too long. With 8 partner logos a signature is about 8,500 characters.
+- **Empty fields are left out.** An employee without a job title, mobile or email gets a signature without that line (never a placeholder). Copy and Download need at least the full name; until then the preview is only a sample.
+- **Phone links work from a phone.** "+27 (0)82 …" and "082 …" both link to +27 82 …; an email address that does not look valid is shown without a link and flagged.
+- **Gmail size check.** The builder counts the signature the way Gmail stores it and compares it with Gmail's 10,000-character limit. It turns amber from 9,700 characters, because Gmail's editor adds about 100 characters when you paste. With 8 partner logos a signature is about 8,600 characters; with 12 image logos it is close to the limit.
 - **Two outputs:**
   - **Copy formatted signature**: a lean version for pasting into Gmail, Outlook on the web / new Outlook, Apple Mail and other signature editors.
   - **Download personalised HTML**: a full version that also contains the Outlook-for-Windows (VML) background code. Use it as a classic Outlook signature file (see below).
@@ -42,9 +44,9 @@ This is a changed-files-only update for the Signature Builder added in v2.9.0. I
    - `storage/app` → **755** (normally already writable)
 4. **Only if `/signature-builder` returns a 404 or the menu item is missing**, clear the cache: open `https://isoadmin.co.za/public/isoadmin-clear-cache-v221.php?key=iso-v221-route-repair` (if that file is still in `public/`), or delete `bootstrap/cache/routes-v7.php`, `bootstrap/cache/routes.php`, `bootstrap/cache/config.php` (whichever exist) and the `.php` files inside `storage/framework/views/`.
 5. **Upload the official company logo.** Log in → **Admin → Signature Builder → Manage Logos → Company logo** → choose the logo file → **Upload Company Logo**.
-   - Best file: the normal full-colour ISO-Reliability Partners logo as a **PNG with a transparent background**, about **400 × 128 px**. It is shown at up to 200 × 64 px on a white tab.
+   - Best file: the normal full-colour ISO-Reliability Partners logo as a **PNG or JPG on a solid white background**, about **400 × 128 px**. It is shown at up to 200 × 64 px on a white tab. Avoid a transparent background: email apps in dark mode can darken the white tab but not the image, so a transparent logo can end up dark-on-dark.
    - Use PNG or JPG. Outlook for Windows cannot display WebP, and SVG is not shown by most email clients.
-6. **Upload the partner logos** in the same page (PPL, BioMax, Royal Purple, Bel-Ray, Calumet, Yateks, Filter Focus, Seal Saver). Until they are uploaded they show as text tiles.
+6. **Upload the partner logos** in the same page (PPL, BioMax, Royal Purple, Bel-Ray, Calumet, Yateks, Filter Focus, Seal Saver), also on a solid white background. Until they are uploaded they show as text tiles.
 7. Open **Signature Builder**, pick an employee (or type the details), and check the preview with and without the background.
 
 No database update, updater page or console command is required.
@@ -56,11 +58,10 @@ No database update, updater page or console command is required.
 **Outlook on the web / Microsoft 365 / new Outlook for Windows:** Settings → *Account* → *Signatures* → *New signature* → paste → *Save*.
 
 **Classic Outlook for Windows (desktop), keeping the background artwork:**
-1. In the builder click **Download personalised HTML**.
-2. Rename the downloaded file from `.html` to `.htm` (for example `IISO_Jane_Smith.htm`).
-3. Press **Windows + R**, type `%APPDATA%\Microsoft\Signatures` and press Enter.
-4. Copy the `.htm` file into that folder.
-5. In Outlook: File → Options → Mail → *Signatures…* → select the new signature as the default for new messages and replies.
+1. In the builder click **Download personalised HTML**. The file is already saved as `IISO_Email_Signature_<Name>.htm`; rename it if you like (keep the `.htm` ending).
+2. Press **Windows + R**, type `%APPDATA%\Microsoft\Signatures` and press Enter.
+3. Copy the `.htm` file into that folder.
+4. In Outlook: File → Options → Mail → *Signatures…* → select the new signature as the default for new messages and replies.
 
 (Pasting into classic Outlook's own signature editor also works, but that editor drops the background, so the band shows as solid teal.)
 
@@ -71,6 +72,7 @@ No database update, updater page or console command is required.
 ## Good to know
 
 - Signatures load all images (company logo, partner logos, background) from **isoadmin.co.za**. Some recipients' email programs ask them to "download pictures" first. This is normal for every image-based signature.
-- **Don't delete an image that signatures already use.** Emails already sent keep pointing to it. If you must replace a logo, replace it, then re-copy the signatures. A replaced image gets a new file name.
-- If the builder shows the size line in amber (over 10,000 characters), Gmail will refuse the signature. Hide one or two partner logos under Manage Logos, or shorten the partner logo links.
+- **Replacing an image is safe; removing it is not.** Emails already sent keep pointing to the image they were sent with. *Replace* (company logo, background, partner logo) uploads the new image under a new file name and keeps the old file, so those emails still show the old image; re-copy the signatures to use the new one. *Remove*, *Delete* and *Reset to Default Background* delete the file, and emails already sent then show a broken image.
+- If the builder shows the size line in amber, the signature is close to or over Gmail's 10,000-character limit and Gmail may refuse it. Hide one or two partner logos under Manage Logos, or shorten long brand names or external image links.
+- Before rolling the signatures out, send a test email from each place you set one up (Gmail, Outlook on the web, classic Outlook) to an Outlook desktop mailbox, a phone and a Gmail account. Check that the contact links are not underlined and the layout holds. Classic Outlook users should install the downloaded `.htm` file rather than pasting into Outlook's editor.
 - The default artwork can be re-rendered or changed from `resources/signature/` in the source repository (see `resources/signature/README.md`). The server does not need those files.

@@ -6,8 +6,10 @@
     .sigb-grid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
     .sigb-grid .form-row{margin-bottom:12px}
     .sigb-check{margin:4px 0 14px;cursor:pointer;font-size:13px;font-weight:700;line-height:1.45;color:#dff8d6}
+    .sigb-check input:focus-visible{outline:2px solid var(--brand2);outline-offset:2px}
     .sigb-buttons{display:grid;gap:10px;margin-top:6px}
-    .sigb-msg{min-height:18px;font-size:13px;font-weight:800;color:var(--brand2);margin-top:10px}
+    .sigb-msg{min-height:18px;font-size:13px;font-weight:800;line-height:1.45;color:var(--brand2);margin-top:10px}
+    .sigb-msg:empty{min-height:0;margin-top:0}
     .sigb-msg.warn{color:var(--warn)}
     .sigb-status{display:grid;gap:8px;margin-top:12px}
     .sigb-stat{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:14px;background:rgba(18,163,116,.1);border:1px solid rgba(18,163,116,.28);font-size:13px;line-height:1.5;color:#cfeee0}
@@ -15,13 +17,22 @@
     .sigb-stat.warn{background:rgba(245,185,76,.1);border-color:rgba(245,185,76,.35);color:#ffe4ad}
     .sigb-stat.warn::before{background:var(--warn);box-shadow:0 0 0 4px rgba(245,185,76,.12)}
     .sigb-stat strong{color:#fff;font-weight:850}
+    .sigb-nowrap{white-space:nowrap}
     .sigb-stat a,.sigb-warnings a{color:var(--brand2);font-weight:800}
     .sigb-warnings{margin:0;padding:10px 12px 10px 30px;border-radius:14px;background:rgba(245,185,76,.07);border:1px solid rgba(245,185,76,.3);font-size:12.5px;line-height:1.5;color:#ffe4ad}
     .sigb-warnings li+li{margin-top:4px}
     .sigb-frame{position:relative;background:#fff;border-radius:var(--radius);padding:25px;overflow:auto;box-shadow:var(--shadow)}
-    .sigb-frame-title{font:bold 10px Arial,Helvetica,sans-serif;letter-spacing:1.6px;color:#80928b;margin:0 0 22px}
-    .sigb-holder{display:block;width:640px;max-width:none;height:340px;border:0;background:#fff}
-    @media(max-width:1080px){.sigb-grid{grid-template-columns:1fr}}
+    .sigb-frame-title{font:bold 10px Arial,Helvetica,sans-serif;letter-spacing:1.6px;color:#5E716E;margin:0 0 22px}
+    .sigb-fit{overflow:hidden}
+    .sigb-holder{display:block;width:640px;max-width:none;height:340px;border:0;background:#fff;transform-origin:0 0}
+    .page-head > .actions{flex:none}
+    .page-head > .actions .btn{white-space:nowrap}
+    /* The signature is 640px wide. Below 1400px the form column narrows and the frame padding shrinks, so the
+       preview stays 1:1 down to about 1366px and is scaled to fit (fitPreview, at least ~0.86) down to 1240px.
+       Narrower: one column with the preview first. It is never cut off. */
+    @media(max-width:1400px){.sigb-grid{grid-template-columns:300px minmax(0,1fr)}.sigb-frame{padding:16px}.sigb-frame-title{margin-bottom:16px}}
+    @media(max-width:1239px){.sigb-grid{grid-template-columns:1fr}.sigb-frame{order:-1}}
+    @media(max-width:560px){.sigb-frame{padding:12px}.sigb-frame-title{margin-bottom:12px}}
 </style>
 
 <div class="page-head">
@@ -44,7 +55,7 @@
         <div class="form-row">
             <label for="sigbEmployee">Load from employee (optional)</label>
             <select id="sigbEmployee">
-                <option value="">— Type details manually —</option>
+                <option value="">— Choose an employee —</option>
                 @foreach($employees as $employee)
                     <option value="{{ $employee['id'] }}">{{ $employee['name'] }}</option>
                 @endforeach
@@ -83,7 +94,7 @@
             @if($companyLogo)
                 <div id="sigbCompany" class="sigb-stat"><span>Company logo uploaded · loading…</span></div>
             @else
-                <div id="sigbCompany" class="sigb-stat warn"><span>No company logo uploaded — upload it under <a href="{{ route('signature_builder.logos') }}">Manage Logos</a>. Until then the signature shows “ISO-Reliability Partners” as text.</span></div>
+                <div id="sigbCompany" class="sigb-stat warn"><span>No company logo uploaded — upload it under <a href="{{ route('signature_builder.logos') }}">Manage Logos</a>. Until then the signature shows <span class="sigb-nowrap">“ISO-Reliability Partners”</span> as text.</span></div>
             @endif
             <div id="sigbLogoSummary" class="sigb-stat" aria-live="polite"><span>Loading brand logos…</span></div>
             <ul id="sigbWarnings" class="sigb-warnings" aria-live="polite" hidden></ul>
@@ -93,7 +104,7 @@
 
     <div class="sigb-frame">
         <div class="sigb-frame-title" id="sigbFrameTitle">LIVE EMAIL SIGNATURE PREVIEW</div>
-        <iframe class="sigb-holder" id="signature" title="Email signature preview" scrolling="no"></iframe>
+        <div class="sigb-fit" id="sigbFit"><iframe class="sigb-holder" id="signature" title="Email signature preview" scrolling="no"></iframe></div>
     </div>
 </div>
 
@@ -111,17 +122,19 @@
     var COMPANY_BOX_W = 200, COMPANY_BOX_H = 64;
     var LOGO_BOX_W = 130, LOGO_BOX_H = 42, PER_ROW = 4;
     var TEXT_W = 328;                                 // name + title column (x 248 to 576)
-    var SPAN_W = 276;                                 // full-width contact value of CONTACT_ROWS_LONG
-    var EMAIL_NORMAL_MAX = 124, MOBILE_NORMAL_MAX = 92;   // wider -> CONTACT_ROWS_LONG
+    var SPAN_W = 276;                                 // full-width contact value of a stacked CONTACT_ROW
+    var EMAIL_NORMAL_MAX = 124, MOBILE_NORMAL_MAX = 92;   // wider -> stacked CONTACT_ROWs
     var TILE_TEXT_W = 136;                            // longest unbroken word in a text partner tile
     var NAME_SIZES = [23, 20, 18];
     var GMAIL_LIMIT = 10000;
+    var GMAIL_SAFE = 9700;                            // warn from here: an editor's own paste rewrite adds ~100 characters
+    var EMAIL_RE = /^[A-Za-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
     var ZW = '\u200B', BREAK_AFTER = '.-_/,';
     var logoState = {};
     var companyState = { status: companyLogo ? 'loading' : 'none' };
 
     // ---- Signature design "C - Bold brand banner": template + snippets ------------------------
-    // Copied verbatim from the design's template.html / cells.html. Tokens are {{NAME}} style and are filled
+    // From the design's template.html / cells.html (contact rows composed per value). Tokens are {{NAME}} style and are filled
     // by put() with a function replacer, so "$&" or "{{X}}" typed into a field is inserted literally.
     var TEMPLATE = [
         '<table role="presentation" cellpadding="0" cellspacing="0" width="640" bgcolor="#FFFFFF" style="width:640px">',
@@ -129,7 +142,7 @@
         '<td width="223" valign="top" style="padding:16px 8px 9px 17px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:13px;font-weight:bold;letter-spacing:0.8px;color:#A9EDCB;mso-line-height-rule:exactly">CLEANER OIL <span style="color:#8BDC65">&bull;</span> BETTER LUBRICATION<br>LONGER EQUIPMENT LIFE</td>',
         '<td width="392" rowspan="2" valign="top" style="padding:16px 0 10px"><table cellpadding="0" cellspacing="0" width="392">',
         '<tr><td colspan="4" style="font-family:Arial,Helvetica,sans-serif;font-size:{{NAME_SIZE}}px;line-height:{{NAME_LH}}px;font-weight:bold;color:#FFFFFF;mso-line-height-rule:exactly">{{NAME}}</td></tr>',
-        '<tr><td colspan="4" style="padding-top:3px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;font-weight:bold;letter-spacing:1.3px;color:#A9EDCB;mso-line-height-rule:exactly">{{TITLE}}</td></tr>',
+        '{{TITLE_ROW}}',
         '<tr><td colspan="5" style="padding:9px 0 10px"><table cellpadding="0" cellspacing="0" width="392"><tr><td width="12" bgcolor="#F2B444" style="font-size:2px;line-height:2px;mso-line-height-rule:exactly">&nbsp;</td><td width="28" bgcolor="#8BDC65" style="font-size:2px;line-height:2px;mso-line-height-rule:exactly">&nbsp;</td><td width="352" bgcolor="#2A8C76" style="font-size:2px;line-height:2px;mso-line-height-rule:exactly">&nbsp;</td></tr></table></td></tr>',
         '{{CONTACT_ROWS}}',
         '</table></td>',
@@ -141,18 +154,24 @@
         '</table>'
     ].join('\n');
 
+    var LABEL_STYLE = 'font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:19px;font-weight:bold;letter-spacing:1px;color:#8BDC65';
+    var VALUE_STYLE = 'font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px';
     var SNIP = {
+        TITLE_ROW: '<tr><td colspan="4" style="padding-top:3px;font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:14px;font-weight:bold;letter-spacing:1.3px;color:#A9EDCB;mso-line-height-rule:exactly">{{TITLE}}</td></tr>',
         VML_OPEN: '<!--[if gte mso 9]><v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="width:480pt;height:99pt"><v:fill type="frame" src="{{BG_URL}}" color="#0D4B4A" aspect="atleast"/><v:textbox style="mso-fit-shape-to-text:true" inset="0,0,0,0"><![endif]--><div>',
         VML_CLOSE: '</div><!--[if gte mso 9]></v:textbox></v:rect><![endif]-->',
         CONTACT_ROWS_NORMAL: [
-            '<tr><td width="52" style="font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:19px;font-weight:bold;letter-spacing:1px;color:#8BDC65">MOBILE</td><td width="104" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px"><a href="{{MOBILE_HREF}}" style="color:#FFFFFF;text-decoration:none">{{MOBILE}}</a></td><td width="46" style="font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:19px;font-weight:bold;letter-spacing:1px;color:#8BDC65">EMAIL</td><td width="126" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px"><a href="{{EMAIL_HREF}}" style="color:#FFFFFF;text-decoration:none">{{EMAIL}}</a></td><td width="64"></td></tr>',
-            '<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:19px;font-weight:bold;letter-spacing:1px;color:#8BDC65">OFFICE</td><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px"><a href="tel:+27104496414" style="color:#FFFFFF;text-decoration:none">+27&nbsp;10&nbsp;449&nbsp;6414</a></td><td style="font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:19px;font-weight:bold;letter-spacing:1px;color:#8BDC65">WEB</td><td style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px"><a href="https://iiso.co.za/" style="color:#FFFFFF;text-decoration:none;font-weight:bold">www.iiso.co.za</a></td></tr>'
+            '<tr><td width="52" style="' + LABEL_STYLE + '">MOBILE</td><td width="104" style="' + VALUE_STYLE + '">{{MOBILE_LINK}}</td><td width="46" style="' + LABEL_STYLE + '">EMAIL</td><td width="126" style="' + VALUE_STYLE + '">{{EMAIL_LINK}}</td><td width="64"></td></tr>',
+            '<tr><td style="' + LABEL_STYLE + '">OFFICE</td><td style="' + VALUE_STYLE + '"><a href="tel:+27104496414" style="color:#FFFFFF;text-decoration:none">+27&nbsp;10&nbsp;449&nbsp;6414</a></td><td style="' + LABEL_STYLE + '">WEB</td><td style="' + VALUE_STYLE + '"><a href="https://iiso.co.za/" style="color:#FFFFFF;text-decoration:none;font-weight:bold">www.iiso.co.za</a></td></tr>'
         ].join('\n'),
-        CONTACT_ROWS_LONG: [
-            '<tr><td width="52" valign="top" style="font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:19px;font-weight:bold;letter-spacing:1px;color:#8BDC65">MOBILE</td><td colspan="3" style="word-break:break-word;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px"><a href="{{MOBILE_HREF}}" style="color:#FFFFFF;text-decoration:none">{{MOBILE}}</a></td><td width="64"></td></tr>',
-            '<tr><td valign="top" style="font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:19px;font-weight:bold;letter-spacing:1px;color:#8BDC65">EMAIL</td><td colspan="3" style="word-break:break-word;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px"><a href="{{EMAIL_HREF}}" style="color:#FFFFFF;text-decoration:none">{{EMAIL}}</a></td></tr>',
-            '<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:19px;font-weight:bold;letter-spacing:1px;color:#8BDC65">OFFICE</td><td width="104" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px"><a href="tel:+27104496414" style="color:#FFFFFF;text-decoration:none">+27&nbsp;10&nbsp;449&nbsp;6414</a></td><td width="46" style="font-family:Arial,Helvetica,sans-serif;font-size:10px;line-height:19px;font-weight:bold;letter-spacing:1px;color:#8BDC65">WEB</td><td width="126" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px"><a href="https://iiso.co.za/" style="color:#FFFFFF;text-decoration:none;font-weight:bold">www.iiso.co.za</a></td></tr>'
-        ].join('\n'),
+        // stacked rows (a long value, or a missing mobile / email): one full-width value row per contact, then
+        // OFFICE + WEB. The first row of the table carries the column widths ({{LABEL_W}} and the 64px {{GAP}}).
+        CONTACT_ROW: '<tr><td{{LABEL_W}} valign="top" style="' + LABEL_STYLE + '">{{LABEL}}</td><td colspan="3" style="word-break:break-word;' + VALUE_STYLE + '">{{LINK}}</td>{{GAP}}</tr>',
+        OFFICE_ROW: '<tr><td{{LABEL_W}} style="' + LABEL_STYLE + '">OFFICE</td><td width="104" style="' + VALUE_STYLE + '"><a href="tel:+27104496414" style="color:#FFFFFF;text-decoration:none">+27&nbsp;10&nbsp;449&nbsp;6414</a></td><td width="46" style="' + LABEL_STYLE + '">WEB</td><td width="126" style="' + VALUE_STYLE + '"><a href="https://iiso.co.za/" style="color:#FFFFFF;text-decoration:none;font-weight:bold">www.iiso.co.za</a></td>{{GAP}}</tr>',
+        MOBILE_LINK: '<a href="{{MOBILE_HREF}}" style="color:#FFFFFF;text-decoration:none">{{MOBILE}}</a>',
+        MOBILE_TEXT: '<span style="color:#FFFFFF">{{MOBILE}}</span>',
+        EMAIL_LINK: '<a href="{{EMAIL_HREF}}" style="color:#FFFFFF;text-decoration:none">{{EMAIL}}</a>',
+        EMAIL_TEXT: '<span style="color:#FFFFFF">{{EMAIL}}</span>',
         COMPANY_LOGO_IMG: '<img src="{{COMPANY_LOGO_SRC}}" alt="ISO-Reliability Partners" width="{{W}}" height="{{H}}" style="display:block;border:0;font-size:13px;line-height:16px">',
         COMPANY_LOGO_TEXT: 'ISO-Reliability Partners',
         BRANDS_SECTION: [
@@ -262,6 +281,18 @@
         }).join('');
     }
 
+    // tel: target of a typed number: no extension, "00" -> "+", no "(0)" trunk prefix after a country code,
+    // and the South African national format (0xx xxx xxxx, +27 0xx ...) as +27xx..., e.g. "+27 (0)82 555 0123" -> +27825550123
+    function telNumber(number) {
+        var digits = String(number)
+            .replace(/\s*(ext\.?|x)\s*\d.*$/i, '')
+            .replace(/^\s*00(?=\s*[1-9])/, '+')
+            .replace(/\(\s*0\s*\)/g, '')
+            .replace(/[^+0-9]/g, '')
+            .replace(/(?!^)\+/g, '');
+        return digits.replace(/^\+270(?=\d{9}$)/, '+27').replace(/^0(?=\d{9}$)/, '+27');
+    }
+
     // Mobile: &nbsp; only inside each number, so a number never splits; several numbers may wrap after a separator.
     function mobileValue(raw, warnings) {
         var numbers = [], separators = [];
@@ -293,17 +324,60 @@
         if (width > SPAN_W && numbers.length > 1) {
             warnings.push('The mobile numbers do not fit on one line, so they wrap after a separator.');
         }
-        var digits = (numbers[0] || '').replace(/\s*(ext\.?|x)\s*\d.*$/i, '').replace(/[^+0-9]/g, '');
-        return { html: html, width: width, href: 'tel:' + (digits || '+27000000000') };
+        var tel = telNumber(numbers[0] || '');
+        return { html: html, width: width, href: 'tel:' + tel, linked: tel.replace(/\D/g, '').length >= 6 };
     }
 
+    // The four inputs, whitespace-normalised. An empty value is left out of the signature; only while the name
+    // is empty does the preview show a sample with [PLACEHOLDERS], and Copy / Download refuse to run.
     function values() {
         return {
-            name: $('personName').value.trim() || '[FULL NAME]',
-            title: $('personTitle').value.trim() || '[JOB TITLE]',
-            mobile: $('personMobile').value.trim() || '[MOBILE]',
-            email: $('personEmail').value.trim() || '[YOUR EMAIL]'
+            name: norm($('personName').value),
+            title: norm($('personTitle').value),
+            mobile: norm($('personMobile').value),
+            email: norm($('personEmail').value)
         };
+    }
+
+    function missingFields(v) {
+        return [['title', 'a job title'], ['mobile', 'a mobile number'], ['email', 'an email address']]
+            .filter(function (f) { return !v[f[0]]; })
+            .map(function (f) { return f[1]; });
+    }
+
+    function listText(items) {
+        return items.length < 2 ? items.join('') : items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+    }
+
+    // NORMAL: mobile and email side by side. Otherwise one full-width row per contact that has a value.
+    function contactRows(mobile, email, stacked) {
+        if (mobile && email && !stacked) {
+            return put(SNIP.CONTACT_ROWS_NORMAL, { MOBILE_LINK: mobile, EMAIL_LINK: email });
+        }
+        var items = [];
+        if (mobile) {
+            items.push(['MOBILE', mobile]);
+        }
+        if (email) {
+            items.push(['EMAIL', email]);
+        }
+        var first = { LABEL_W: ' width="52"', GAP: '<td width="64"></td>' }, next = { LABEL_W: '', GAP: '' };
+        var rows = items.map(function (item, i) {
+            return put(SNIP.CONTACT_ROW, { LABEL_W: (i ? next : first).LABEL_W, GAP: (i ? next : first).GAP, LABEL: item[0], LINK: item[1] });
+        });
+        rows.push(put(SNIP.OFFICE_ROW, items.length ? next : first));
+        return rows.join('\n');
+    }
+
+    // Characters a signature editor such as Gmail's stores: the markup parsed and serialised again (it adds
+    // <tbody> to every table and decodes entities such as &bull;). Gmail's 10,000 limit applies to that.
+    function editorChars(html) {
+        var t = document.createElement('template');
+        if (!('content' in t)) {
+            return html.length;
+        }
+        t.innerHTML = html;
+        return t.innerHTML.length;
     }
 
     function brandCell(logo, warnings) {
@@ -353,7 +427,11 @@
     function buildSignature(variant, withoutBackground) {
         var v = values();
         var warnings = [];
-        var name = norm(v.name), title = norm(v.title).toUpperCase(), email = norm(v.email);
+        var sample = !v.name;
+        var name = v.name || '[FULL NAME]';
+        var title = (v.title || (sample ? '[JOB TITLE]' : '')).toUpperCase();
+        var mobileRaw = v.mobile || (sample ? '[MOBILE]' : '');
+        var email = v.email || (sample ? '[YOUR EMAIL]' : '');
         var bg = withoutBackground ? null : safeSrc(background);
         var full = variant === 'full' && !!bg;
 
@@ -379,10 +457,26 @@
         if (titleBroken !== title) {
             warnings.push('A word in the job title is wider than the text column; soft line breaks were added.');
         }
-        var mobile = mobileValue(v.mobile, warnings);
+        var mobile = mobileValue(mobileRaw, warnings);
         var emailWidth = textWidth(email, 12);
         if (emailWidth > SPAN_W) {
             warnings.push('The email address is too long for one line, so it wraps at a dot, dash or the @.');
+        }
+        var emailLinked = EMAIL_RE.test(email);
+        if (!sample) {
+            if (!v.title) {
+                warnings.push('No job title entered, so the title line is left out of the signature.');
+            }
+            if (!v.mobile) {
+                warnings.push('No mobile number entered, so the MOBILE line is left out of the signature.');
+            } else if (!mobile.linked) {
+                warnings.push('The mobile number “' + v.mobile + '” has too few digits to dial, so it is shown without a phone link.');
+            }
+            if (!v.email) {
+                warnings.push('No email address entered, so the EMAIL line is left out of the signature.');
+            } else if (!emailLinked) {
+                warnings.push('The email address “' + v.email + '” does not look valid, so it is shown without a link. Check it for typos.');
+            }
         }
         var longContacts = emailWidth > EMAIL_NORMAL_MAX || mobile.width > MOBILE_NORMAL_MAX;
 
@@ -390,7 +484,12 @@
         var html = put(TEMPLATE, {
             VML_OPEN: full ? SNIP.VML_OPEN : '',
             VML_CLOSE: full ? SNIP.VML_CLOSE : '',
-            CONTACT_ROWS: longContacts ? SNIP.CONTACT_ROWS_LONG : SNIP.CONTACT_ROWS_NORMAL,
+            TITLE_ROW: title ? SNIP.TITLE_ROW : '',
+            CONTACT_ROWS: contactRows(
+                mobileRaw ? (mobile.linked ? SNIP.MOBILE_LINK : SNIP.MOBILE_TEXT) : '',
+                email ? (emailLinked ? SNIP.EMAIL_LINK : SNIP.EMAIL_TEXT) : '',
+                longContacts
+            ),
             BRANDS_SECTION: brandsSection(warnings),
             COMPANY_LOGO: companyLogoMarkup()
         });
@@ -407,14 +506,14 @@
             TITLE: escZW(titleBroken),
             MOBILE_HREF: mobile.href,
             MOBILE: mobile.html,
-            EMAIL_HREF: 'mailto:' + esc(/^[^\s@<>"']+@[^\s@<>"']+$/.test(email) ? email : 'info@iiso.co.za'),
+            EMAIL_HREF: 'mailto:' + esc(email.replace(/[%?#]/g, encodeURIComponent)),
             EMAIL: escZW(emailWidth > SPAN_W ? softBreak(email, SPAN_W, 12) : email)
         }).replace(/\n/g, '');
         var left = html.match(/\{\{[A-Z_]+\}\}/);
         if (left) {
             throw new Error('Unfilled signature token ' + left[0]);
         }
-        return { html: html, chars: html.length, warnings: warnings };
+        return { html: html, size: editorChars(html), warnings: warnings, sample: sample, missing: sample ? [] : missingFields(v) };
     }
 
     function signatureHtml(variant, withoutBackground) {
@@ -423,12 +522,18 @@
 
     function signaturePlainText() {
         var v = values();
-        var lines = [
-            v.name,
-            v.title + ' | ISO-Reliability Partners',
-            'Mobile: ' + v.mobile + ' | Email: ' + v.email,
-            'Office: +27 10 449 6414 | Web: www.iiso.co.za'
-        ];
+        var contacts = [];
+        if (v.mobile) {
+            contacts.push('Mobile: ' + v.mobile);
+        }
+        if (v.email) {
+            contacts.push('Email: ' + v.email);
+        }
+        var lines = [v.name, (v.title ? v.title + ' | ' : '') + 'ISO-Reliability Partners'];
+        if (contacts.length) {
+            lines.push(contacts.join(' | '));
+        }
+        lines.push('Office: +27 10 449 6414 | Web: www.iiso.co.za');
         if (logos.length) {
             lines.push('Our brands & technology partners: ' + logos.map(function (l) { return l.name; }).join(', '));
         }
@@ -449,12 +554,30 @@
         return $('signature').contentDocument;
     }
 
+    var previewHeight = 150, fitWidth = -1;
+
     function writePreview(markup) {
         var doc = previewDocument();
         doc.open();
         doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#fff">' + markup + '</body></html>');
         doc.close();
-        $('signature').style.height = Math.max(150, doc.body.offsetHeight) + 'px';
+        previewHeight = Math.max(150, doc.body.offsetHeight);
+        $('signature').style.height = previewHeight + 'px';
+        fitWidth = -1;
+        fitPreview();
+    }
+
+    // Narrower than 640px (tablets, phones): scale the whole signature down instead of cutting it off.
+    function fitPreview() {
+        var box = $('sigbFit');
+        var avail = box.clientWidth;
+        if (avail === fitWidth) {
+            return;
+        }
+        fitWidth = avail;
+        var scale = avail > 0 && avail < 640 ? avail / 640 : 1;
+        $('signature').style.transform = scale < 1 ? 'scale(' + scale + ')' : '';
+        box.style.height = Math.ceil(previewHeight * scale) + 'px';
     }
 
     function fmt(n) {
@@ -466,17 +589,22 @@
         el.innerHTML = '<span>' + html + '</span>';
     }
 
+    var COMPANY_NAME_HTML = '<span class="sigb-nowrap">“ISO-Reliability Partners”</span>';
+
     function manageLink() {
         return '<a href="' + esc(manageLogosUrl) + '">Manage Logos</a>';
     }
 
+    // count = editorChars() of the copied markup
     function updateSizeStatus(count) {
-        var over = count > GMAIL_LIMIT;
+        var over = count > GMAIL_LIMIT, near = !over && count > GMAIL_SAFE;
         var html = 'Signature size: <strong>' + fmt(count) + ' / ' + fmt(GMAIL_LIMIT) + ' characters</strong> (Gmail limit)';
         if (over) {
-            html += ' — too long for Gmail. Hide a partner logo under ' + manageLink() + ' (about 340 characters each) or use shorter image file names.';
+            html += ' — too long for Gmail, which will refuse it. Hide a partner logo under ' + manageLink() + ' (about 300 characters each), or shorten long brand names or external image links.';
+        } else if (near) {
+            html += ' — close to the limit. Gmail’s editor adds about 100 characters when you paste, so Gmail may refuse it. To be safe, hide a partner logo under ' + manageLink() + '.';
         }
-        setStat($('sigbSize'), over ? 'warn' : '', html);
+        setStat($('sigbSize'), over || near ? 'warn' : '', html);
     }
 
     function updateWarnings(warnings) {
@@ -488,13 +616,13 @@
     function updateCompanyStatus() {
         var el = $('sigbCompany');
         if (companyState.status === 'ok') {
-            setStat(el, '', 'Company logo uploaded · shown at <strong>' + companyState.w + ' × ' + companyState.h + ' px</strong> on the white tab.');
+            setStat(el, '', 'Company logo uploaded · shown at <strong class="sigb-nowrap">' + companyState.w + ' × ' + companyState.h + ' px</strong> on the white tab.');
         } else if (companyState.status === 'loading') {
             setStat(el, '', 'Company logo uploaded · loading…');
         } else if (companyState.status === 'failed') {
-            setStat(el, 'warn', 'The uploaded company logo could not be loaded, so the signature shows “ISO-Reliability Partners” as text. Check it under ' + manageLink() + '.');
+            setStat(el, 'warn', 'The uploaded company logo could not be loaded, so the signature shows ' + COMPANY_NAME_HTML + ' as text. Check it under ' + manageLink() + '.');
         } else {
-            setStat(el, 'warn', 'No company logo uploaded — upload it under ' + manageLink() + '. Until then the signature shows “ISO-Reliability Partners” as text.');
+            setStat(el, 'warn', 'No company logo uploaded — upload it under ' + manageLink() + '. Until then the signature shows ' + COMPANY_NAME_HTML + ' as text.');
         }
     }
 
@@ -506,30 +634,35 @@
         var withImage = logos.filter(function (l) { return l.src; }).length;
         var showing = logos.filter(function (l) { return logoState[l.id] && logoState[l.id].ok; }).length;
         var pending = logos.filter(function (l) { return l.src && !logoState[l.id]; }).length;
+        var failed = logos.filter(function (l) { return l.src && logoState[l.id] && !logoState[l.id].ok; }).map(function (l) { return norm(l.name); });
         var noImage = logos.length - withImage;
         var text = logos.length + ' active brand logo' + (logos.length === 1 ? '' : 's');
         if (withImage) {
             text += ' · ' + showing + ' of ' + withImage + ' image' + (withImage === 1 ? '' : 's') + ' displaying' + (pending ? ' (loading…).' : '.');
-            if (!pending && showing < withImage) {
-                text += ' Logos that failed to load show their brand name as text.';
-            }
         } else {
             text += '.';
         }
         if (noImage) {
-            text += ' ' + (noImage === logos.length ? 'None has an image yet, so they show' : noImage + ' brand' + (noImage === 1 ? ' has' : 's have') + ' no image yet and show') + ' as text tiles.';
+            text += ' ' + (noImage === logos.length ? 'None has an image yet, so they show as text tiles.'
+                : noImage === 1 ? '1 brand has no image yet and shows as a text tile.'
+                : noImage + ' brands have no image yet and show as text tiles.');
         }
-        setStat($('sigbLogoSummary'), '', esc(text));
+        var html = esc(text);
+        if (failed.length) {
+            html += ' <strong>' + esc(listText(failed)) + '</strong> could not be loaded, so ' + (failed.length === 1 ? 'it shows' : 'they show')
+                + ' as text in the signature. Check ' + (failed.length === 1 ? 'it' : 'them') + ' under ' + manageLink() + '.';
+        }
+        setStat($('sigbLogoSummary'), failed.length ? 'warn' : '', html);
     }
 
     function render() {
         var withoutBackground = $('sigbNoBg').checked;
         var lean = buildSignature('lean', false);
         writePreview(withoutBackground ? signatureHtml('lean', true) : lean.html);
-        $('sigbFrameTitle').textContent = withoutBackground
+        $('sigbFrameTitle').textContent = (lean.sample ? 'SAMPLE · ' : '') + (withoutBackground
             ? 'LIVE PREVIEW · WITHOUT BACKGROUND IMAGE (GMAIL / OUTLOOK EDITOR FALLBACK)'
-            : 'LIVE EMAIL SIGNATURE PREVIEW';
-        updateSizeStatus(lean.chars);
+            : 'LIVE EMAIL SIGNATURE PREVIEW');
+        updateSizeStatus(lean.size);
         updateWarnings(lean.warnings);
         $('sigbMsg').textContent = '';
     }
@@ -619,6 +752,12 @@
         $('sigbMsg').className = 'sigb-msg' + (warn ? ' warn' : '');
     }
 
+    var NAME_FIRST = 'Enter the full name first (or choose an employee). The preview is only a sample until then.';
+
+    function withoutText(missing) {
+        return missing.length ? ' without ' + listText(missing) + ' (left empty)' : '';
+    }
+
     ['personName', 'personTitle', 'personMobile', 'personEmail'].forEach(function (id) {
         $(id).addEventListener('input', render);
     });
@@ -640,6 +779,11 @@
     $('copyBtn').addEventListener('click', async function () {
         render();
         var lean = buildSignature('lean', false);
+        if (lean.sample) {
+            showMessage(NAME_FIRST, true);
+            $('personName').focus();
+            return;
+        }
         var plain = signaturePlainText();
         var ok = false;
         if (navigator.clipboard && window.ClipboardItem) {
@@ -659,8 +803,12 @@
         }
         if (!ok) {
             showMessage('Your browser blocked automatic copying; select the preview and copy it manually.', true);
-        } else if (lean.chars > GMAIL_LIMIT) {
-            showMessage('Copied, but the signature is ' + fmt(lean.chars) + ' characters: over Gmail’s 10,000 limit, so Gmail will refuse it. Hide a partner logo and copy again.', true);
+        } else if (lean.size > GMAIL_LIMIT) {
+            showMessage('Copied' + withoutText(lean.missing) + ', but the signature is ' + fmt(lean.size) + ' characters: over Gmail’s 10,000 limit, so Gmail will refuse it. Hide a partner logo and copy again.', true);
+        } else if (lean.size > GMAIL_SAFE) {
+            showMessage('Copied' + withoutText(lean.missing) + '. At ' + fmt(lean.size) + ' characters the signature is close to Gmail’s 10,000 limit: if Gmail refuses it, hide a partner logo under Manage Logos and copy again.', true);
+        } else if (lean.missing.length) {
+            showMessage('Formatted signature copied' + withoutText(lean.missing) + '. Paste it into your email signature settings.', true);
         } else {
             showMessage('Formatted signature copied. Paste it into your email signature settings.', false);
         }
@@ -668,17 +816,29 @@
 
     $('downloadBtn').addEventListener('click', function () {
         render();
-        var blob = new Blob([outlookDocument(signatureHtml('full', false))], { type: 'text/html;charset=utf-8' });
+        var full = buildSignature('full', false);
+        if (full.sample) {
+            showMessage(NAME_FIRST, true);
+            $('personName').focus();
+            return;
+        }
+        var blob = new Blob([outlookDocument(full.html)], { type: 'text/html;charset=utf-8' });
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
         a.href = url;
-        a.download = 'IISO_Email_Signature_' + (($('personName').value.trim() || 'Employee').replace(/[^a-zA-Z0-9_-]/g, '_')) + '.htm';
+        a.download = 'IISO_Email_Signature_' + values().name.replace(/[^a-zA-Z0-9_-]/g, '_') + '.htm';
         document.body.appendChild(a);
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
-        showMessage('Personalised HTML signature downloaded. It includes the Outlook desktop background, so it also works as an Outlook .htm signature file.', false);
+        showMessage('Personalised HTML signature downloaded' + withoutText(full.missing) + '. It includes the Outlook desktop background, so it also works as an Outlook .htm signature file.', full.missing.length > 0);
     });
+
+    if (window.ResizeObserver) {
+        new ResizeObserver(fitPreview).observe($('sigbFit'));
+    } else {
+        window.addEventListener('resize', fitPreview);
+    }
 
     render();
     loadCompanyLogo();
