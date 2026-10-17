@@ -92,6 +92,8 @@ class CoreSettingController extends Controller
         return SystemSetting::query()
             ->where('is_core', true)
             ->whereNotIn('group', ['Vehicle Tracking API', 'Google API'])
+            // The platform version comes from the VERSION file, so any legacy database copy is not editable here.
+            ->where('key', '!=', 'platform_version')
             ->orderByRaw("FIELD(`group`, 'Attendance', 'Identity', 'Notifications', 'Reminders', 'Documents', 'Security', 'Vehicles')")
             ->orderBy('group')
             ->orderBy('sort_order')

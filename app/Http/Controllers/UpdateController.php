@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\PlatformVersion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -30,7 +31,6 @@ class UpdateController extends Controller
 
         return redirect()->route('updates.v1_1')->with('success', 'Version 1.1 update applied. Attendance management is now available.');
     }
-
 
     public function v12()
     {
@@ -401,7 +401,6 @@ class UpdateController extends Controller
         }
     }
 
-
     public function v15()
     {
         $dashboardPreferencesInstalled = Schema::hasTable('dashboard_widget_preferences');
@@ -457,7 +456,6 @@ class UpdateController extends Controller
         }
     }
 
-
     public function v16()
     {
         $columnsInstalled = Schema::hasTable('users')
@@ -504,8 +502,6 @@ class UpdateController extends Controller
                 'password_changed_at' => now(),
             ]);
     }
-
-
 
     public function v17()
     {
@@ -585,8 +581,6 @@ class UpdateController extends Controller
             $manager->permissions()->syncWithoutDetaching($ids);
         }
     }
-
-
 
     public function v25()
     {
@@ -867,7 +861,6 @@ class UpdateController extends Controller
         }
     }
 
-
     public function v26()
     {
         $vehicleTrackingInstalled = Schema::hasTable('vehicle_tracking_snapshots');
@@ -1029,7 +1022,6 @@ class UpdateController extends Controller
         }
     }
 
-
     public function v261()
     {
         $leaveInstalled = Schema::hasTable('leave_requests');
@@ -1055,7 +1047,6 @@ class UpdateController extends Controller
         $this->seedV25LeaveTypes();
         $this->seedV261Permissions();
         $this->seedSystemAdministratorAllPermissions($request->user());
-        $this->seedV261Settings();
 
         return redirect()->route('updates.v2_6_1')->with('success', 'Version 2.6.1 update applied. Calendar and Leave have been restored, the footer version is visible, and System Administrator now has all permissions.');
     }
@@ -1134,28 +1125,6 @@ class UpdateController extends Controller
         }
     }
 
-    private function seedV261Settings(): void
-    {
-        if (Schema::hasTable('system_settings')) {
-            DB::table('system_settings')->updateOrInsert(
-                ['key' => 'platform_version'],
-                [
-                    'group' => 'Identity',
-                    'label' => 'Platform Version',
-                    'value' => '2.6.1',
-                    'type' => 'text',
-                    'description' => 'Current ISO Admin Command Framework package version.',
-                    'sort_order' => 5,
-                    'is_core' => true,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
-        }
-    }
-
-
-
     public function v262()
     {
         $publicHolidaysInstalled = Schema::hasTable('public_holidays');
@@ -1175,7 +1144,6 @@ class UpdateController extends Controller
         $this->seedV262PublicHolidays();
         $this->seedV262AttendanceSettings();
         $this->seedV262Permissions();
-        $this->seedV262Version();
         $rebuilt = 0;
 
         if (Schema::hasTable('attendance_raw_records')) {
@@ -1388,7 +1356,6 @@ class UpdateController extends Controller
         $this->seedV262PublicHolidays();
         $this->seedV262AttendanceSettings();
         $this->seedV262Permissions();
-        $this->seedV263Version();
         $rebuilt = 0;
 
         if (Schema::hasTable('attendance_raw_records')) {
@@ -1400,13 +1367,10 @@ class UpdateController extends Controller
         return redirect()->route('updates.v2_6_3')->with('success', 'Version 2.6.3 repair applied. Public holiday schema repaired, holidays reseeded and attendance days rebuilt: ' . $rebuilt . '.');
     }
 
-
     public function v264()
     {
         $calendarReminderPermission = Permission::where('slug', 'calendar.reminders.view')->exists();
-        $systemVersion = Schema::hasTable('system_settings')
-            ? DB::table('system_settings')->where('key', 'platform_version')->value('value')
-            : null;
+        $systemVersion = PlatformVersion::current();
 
         return view('updates.v2_6_4', compact('calendarReminderPermission', 'systemVersion'));
     }
@@ -1414,7 +1378,6 @@ class UpdateController extends Controller
     public function applyV264(Request $request)
     {
         $this->seedV264Permissions();
-        $this->seedV264Version();
         $this->seedSystemAdministratorAllPermissions($request->user());
 
         return redirect()->route('updates.v2_6_4')->with('success', 'Version 2.6.4 applied. Calendar now starts on Sunday and acts as a central reminder calendar for leave, public holidays, attendance exceptions, employee documents, vehicle documents, vehicle services and tracking sync reminders.');
@@ -1436,72 +1399,9 @@ class UpdateController extends Controller
         }
     }
 
-    private function seedV264Version(): void
-    {
-        if (Schema::hasTable('system_settings')) {
-            DB::table('system_settings')->updateOrInsert(
-                ['key' => 'platform_version'],
-                [
-                    'group' => 'Identity',
-                    'label' => 'Platform Version',
-                    'value' => '2.6.4',
-                    'type' => 'text',
-                    'description' => 'Current ISO Admin Command Framework package version.',
-                    'sort_order' => 5,
-                    'is_core' => true,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
-        }
-    }
-
-    private function seedV263Version(): void
-    {
-        if (Schema::hasTable('system_settings')) {
-            DB::table('system_settings')->updateOrInsert(
-                ['key' => 'platform_version'],
-                [
-                    'group' => 'Identity',
-                    'label' => 'Platform Version',
-                    'value' => '2.6.3',
-                    'type' => 'text',
-                    'description' => 'Current ISO Admin Command Framework package version.',
-                    'sort_order' => 5,
-                    'is_core' => true,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
-        }
-    }
-
-    private function seedV262Version(): void
-    {
-        if (Schema::hasTable('system_settings')) {
-            DB::table('system_settings')->updateOrInsert(
-                ['key' => 'platform_version'],
-                [
-                    'group' => 'Identity',
-                    'label' => 'Platform Version',
-                    'value' => '2.6.2',
-                    'type' => 'text',
-                    'description' => 'Current ISO Admin Command Framework package version.',
-                    'sort_order' => 5,
-                    'is_core' => true,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
-        }
-    }
-
-
     public function v265()
     {
-        $systemVersion = Schema::hasTable('system_settings')
-            ? DB::table('system_settings')->where('key', 'platform_version')->value('value')
-            : null;
+        $systemVersion = PlatformVersion::current();
 
         return view('updates.v2_6_5', compact('systemVersion'));
     }
@@ -1509,7 +1409,6 @@ class UpdateController extends Controller
     public function applyV265(Request $request)
     {
         $this->seedV265TrackingDiagnostics();
-        $this->seedV265Version();
         $this->seedSystemAdministratorAllPermissions($request->user());
 
         return redirect()->route('updates.v2_6_5')->with('success', 'Version 2.6.5 applied. Calendar type filters are available and the Cartrack sync now checks /rest/vehicles/status before falling back to /rest/vehicles, with better diagnostics and vehicle matching.');
@@ -1544,33 +1443,9 @@ class UpdateController extends Controller
         }
     }
 
-    private function seedV265Version(): void
-    {
-        if (Schema::hasTable('system_settings')) {
-            DB::table('system_settings')->updateOrInsert(
-                ['key' => 'platform_version'],
-                [
-                    'group' => 'Identity',
-                    'label' => 'Platform Version',
-                    'value' => '2.6.5',
-                    'type' => 'text',
-                    'description' => 'Current ISO Admin Command Framework package version.',
-                    'sort_order' => 5,
-                    'is_core' => true,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
-        }
-    }
-
-
-
     public function v266()
     {
-        $systemVersion = Schema::hasTable('system_settings')
-            ? DB::table('system_settings')->where('key', 'platform_version')->value('value')
-            : null;
+        $systemVersion = PlatformVersion::current();
         $googleApiSettingsInstalled = Schema::hasTable('system_settings')
             && DB::table('system_settings')->where('group', 'Google API')->exists();
 
@@ -1581,7 +1456,6 @@ class UpdateController extends Controller
     {
         $this->seedV266GoogleApiSettings();
         $this->seedV266Permissions();
-        $this->seedV266Version();
         $this->seedSystemAdministratorAllPermissions($request->user());
 
         return redirect()->route('updates.v2_6_6')->with('success', 'Version 2.6.6 applied. Google API settings are restored, fleet map plotting is available on the main vehicle page, and vehicle route/history maps are available on each vehicle profile.');
@@ -1699,109 +1573,37 @@ class UpdateController extends Controller
         });
     }
 
-    private function seedV266Version(): void
-    {
-        if (Schema::hasTable('system_settings')) {
-            DB::table('system_settings')->updateOrInsert(
-                ['key' => 'platform_version'],
-                [
-                    'group' => 'Identity',
-                    'label' => 'Platform Version',
-                    'value' => '2.6.6',
-                    'type' => 'text',
-                    'description' => 'Current ISO Admin Command Framework package version.',
-                    'sort_order' => 5,
-                    'is_core' => true,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
-        }
-    }
-
-
-
     public function v267()
     {
-        $systemVersion = Schema::hasTable('system_settings')
-            ? DB::table('system_settings')->where('key', 'platform_version')->value('value')
-            : null;
+        $systemVersion = PlatformVersion::current();
 
         return view('updates.v2_6_7', compact('systemVersion'));
     }
 
     public function applyV267(Request $request)
     {
-        $this->seedV267Version();
         $this->seedSystemAdministratorAllPermissions($request->user());
 
         return redirect()->route('updates.v2_6_7')->with('success', 'Version 2.6.7 applied. Vehicle map Blade JSON output has been repaired and the specific vehicle page should now open correctly.');
     }
 
-    private function seedV267Version(): void
-    {
-        if (Schema::hasTable('system_settings')) {
-            DB::table('system_settings')->updateOrInsert(
-                ['key' => 'platform_version'],
-                [
-                    'group' => 'Identity',
-                    'label' => 'Platform Version',
-                    'value' => '2.6.7',
-                    'type' => 'text',
-                    'description' => 'Current ISO Admin Command Framework package version.',
-                    'sort_order' => 5,
-                    'is_core' => true,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
-        }
-    }
-
-
     public function v268()
     {
-        $systemVersion = Schema::hasTable('system_settings')
-            ? DB::table('system_settings')->where('key', 'platform_version')->value('value')
-            : null;
+        $systemVersion = PlatformVersion::current();
 
         return view('updates.v2_6_8', compact('systemVersion'));
     }
 
     public function applyV268(Request $request)
     {
-        $this->seedV268Version();
         $this->seedSystemAdministratorAllPermissions($request->user());
 
         return redirect()->route('updates.v2_6_8')->with('success', 'Version 2.6.8 applied. Vehicle index and vehicle profile map Blade errors have been repaired.');
     }
 
-    private function seedV268Version(): void
-    {
-        if (Schema::hasTable('system_settings')) {
-            DB::table('system_settings')->updateOrInsert(
-                ['key' => 'platform_version'],
-                [
-                    'group' => 'Identity',
-                    'label' => 'Platform Version',
-                    'value' => '2.6.8',
-                    'type' => 'text',
-                    'description' => 'Current ISO Admin Command Framework package version.',
-                    'sort_order' => 5,
-                    'is_core' => true,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
-        }
-    }
-
-
     public function v269()
     {
-        $systemVersion = Schema::hasTable('system_settings')
-            ? DB::table('system_settings')->where('key', 'platform_version')->value('value')
-            : null;
+        $systemVersion = PlatformVersion::current();
         $quickActionsReady = Schema::hasTable('quick_action_preferences');
 
         return view('updates.v2_6_9', compact('systemVersion', 'quickActionsReady'));
@@ -1811,7 +1613,6 @@ class UpdateController extends Controller
     {
         $this->addV269QuickActionPreferencesTable();
         $this->seedV269Permissions();
-        $this->seedV269Version();
         $this->seedSystemAdministratorAllPermissions($request->user());
 
         return redirect()->route('updates.v2_6_9')->with('success', 'Version 2.6.9 applied. Vehicle dashboard, fleet fuel tracking, editable Quick Actions and the Add Fuel vehicle selection flow are now available.');
@@ -1849,32 +1650,9 @@ class UpdateController extends Controller
         });
     }
 
-    private function seedV269Version(): void
-    {
-        if (Schema::hasTable('system_settings')) {
-            DB::table('system_settings')->updateOrInsert(
-                ['key' => 'platform_version'],
-                [
-                    'group' => 'Identity',
-                    'label' => 'Platform Version',
-                    'value' => '2.6.9',
-                    'type' => 'text',
-                    'description' => 'Current ISO Admin Command Framework package version.',
-                    'sort_order' => 5,
-                    'is_core' => true,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
-        }
-    }
-
-
     public function v2610()
     {
-        $systemVersion = Schema::hasTable('system_settings')
-            ? DB::table('system_settings')->where('key', 'platform_version')->value('value')
-            : null;
+        $systemVersion = PlatformVersion::current();
         $customersReady = Schema::hasTable('customers');
 
         return view('updates.v2_6_10', compact('systemVersion', 'customersReady'));
@@ -1884,7 +1662,6 @@ class UpdateController extends Controller
     {
         $this->addV2610CustomersTable();
         $this->seedV2610CustomerPermissions();
-        $this->seedV2610Version();
         $this->seedSystemAdministratorAllPermissions($request->user());
 
         return redirect()->route('updates.v2_6_10')->with('success', 'Version 2.6.10 applied. Customers are now available in the left menu and controlled by the customer permissions.');
@@ -1985,32 +1762,9 @@ class UpdateController extends Controller
         });
     }
 
-    private function seedV2610Version(): void
-    {
-        if (Schema::hasTable('system_settings')) {
-            DB::table('system_settings')->updateOrInsert(
-                ['key' => 'platform_version'],
-                [
-                    'group' => 'Identity',
-                    'label' => 'Platform Version',
-                    'value' => '2.6.10',
-                    'type' => 'text',
-                    'description' => 'Current ISO Admin Command Framework package version.',
-                    'sort_order' => 5,
-                    'is_core' => true,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
-        }
-    }
-
-
     public function v2611()
     {
-        $systemVersion = Schema::hasTable('system_settings')
-            ? DB::table('system_settings')->where('key', 'platform_version')->value('value')
-            : null;
+        $systemVersion = PlatformVersion::current();
         $attendanceInstalled = Schema::hasTable('attendance_days') && Schema::hasTable('attendance_imports') && Schema::hasTable('attendance_raw_records');
         $latestAttendanceDate = $attendanceInstalled ? DB::table('attendance_days')->max('attendance_date') : null;
         $attendanceDayCount = $attendanceInstalled ? DB::table('attendance_days')->count() : 0;
@@ -2027,7 +1781,6 @@ class UpdateController extends Controller
         $this->seedAttendancePermissions();
         $this->seedManualAttendanceUploadPermission();
         $this->seedV262Permissions();
-        $this->seedV2611Version();
 
         $rebuilt = 0;
         if (Schema::hasTable('attendance_raw_records')) {
@@ -2037,26 +1790,6 @@ class UpdateController extends Controller
         $this->seedSystemAdministratorAllPermissions($request->user());
 
         return redirect()->route('updates.v2_6_11')->with('success', 'Version 2.6.11 applied. Attendance CSV import compatibility restored, attendance index defaults to the latest imported day, and existing raw records rebuilt: ' . $rebuilt . '.');
-    }
-
-    private function seedV2611Version(): void
-    {
-        if (Schema::hasTable('system_settings')) {
-            DB::table('system_settings')->updateOrInsert(
-                ['key' => 'platform_version'],
-                [
-                    'group' => 'Identity',
-                    'label' => 'Platform Version',
-                    'value' => '2.6.11',
-                    'type' => 'text',
-                    'description' => 'Current ISO Admin Command Framework package version.',
-                    'sort_order' => 5,
-                    'is_core' => true,
-                    'updated_at' => now(),
-                    'created_at' => now(),
-                ]
-            );
-        }
     }
 
 }

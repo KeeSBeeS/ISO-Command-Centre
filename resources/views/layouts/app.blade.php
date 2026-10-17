@@ -193,7 +193,7 @@
                 </div>
             @endif
             @yield('content')
-            <div class="footer-note">ISO Admin Command Framework {{ \Illuminate\Support\Facades\Schema::hasTable('system_settings') ? 'v'.(\App\Models\SystemSetting::valueFor('platform_version', '2.6.10')) : 'v2.6.10' }} · isoadmin.co.za</div>
+            <div class="footer-note">ISO Admin Command Framework v{{ \App\Support\PlatformVersion::current() }} · isoadmin.co.za</div>
         </section>
     </main>
 </div>

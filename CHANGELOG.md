@@ -1,5 +1,26 @@
 # Changelog
 
+## v2.8.6
+
+Single source of truth for the platform version.
+
+- The `VERSION` file is now the only place the platform version is stored; `App\Support\PlatformVersion::current()` reads it.
+- The layout footer and the web updater pages show the version from `VERSION` instead of the `platform_version` database setting.
+- Web updaters no longer write hardcoded version numbers into `system_settings.platform_version`.
+- The legacy `platform_version` row is hidden from Core Settings so it can no longer be edited.
+- Added a test that checks `VERSION` is a semantic version and matches the newest `CHANGELOG.md` entry.
+- No database update is required.
+
+Changed files:
+
+- `VERSION`
+- `CHANGELOG.md`
+- `app/Support/PlatformVersion.php`
+- `app/Http/Controllers/UpdateController.php`
+- `app/Http/Controllers/CoreSettingController.php`
+- `app/Http/Controllers/SettingsController.php`
+- `resources/views/layouts/app.blade.php`
+
 ## v2.8.0 Foreign Key Hotfix
 
 - Fixed MySQL error `1059 Identifier name is too long` during the v2.8.0 update.

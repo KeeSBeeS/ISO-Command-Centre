@@ -10,7 +10,7 @@ ISO Admin Command Framework ("ISO Command Centre") — a Laravel 11 / PHP 8.2+ i
 
 Production is **shared hosting with no console access** (no Composer, NPM, Vite or Artisan on the server). Releases ship as "changed-files-only" packages uploaded over the live install. Consequences:
 
-- **Do not add Laravel migrations** for schema changes. `database/migrations` only holds the stock Laravel tables. Schema changes are done by **web updaters** in `app/Http/Controllers/UpdateController.php`: each version has a `vXY()` page (shows status, view `resources/views/updates/vX_Y.blade.php`) and an `applyVXY()` POST action, routed at `/updates/vX-Y` behind `CheckPermission:settings.manage`. Updaters must be idempotent — guard every change with `Schema::hasTable` / `Schema::hasColumn`, seed permissions with `updateOrInsert`/`firstOrCreate`, re-run `seedSystemAdministratorAllPermissions()`, and write the version to `system_settings.platform_version`. Newer updaters often re-call earlier `add*`/`seed*` helpers so a skipped step is recovered.
+- **Do not add Laravel migrations** for schema changes. `database/migrations` only holds the stock Laravel tables. Schema changes are done by **web updaters** in `app/Http/Controllers/UpdateController.php`: each release that changes the schema has a `vXY()` page (shows status, view `resources/views/updates/vX_Y.blade.php`) and an `applyVXY()` POST action, routed at `/updates/vX-Y` behind `CheckPermission:settings.manage`. Updaters must be idempotent — guard every change with `Schema::hasTable` / `Schema::hasColumn`, seed permissions with `updateOrInsert`/`firstOrCreate`, and re-run `seedSystemAdministratorAllPermissions()`. Newer updaters often re-call earlier `add*`/`seed*` helpers so a skipped step is recovered.
 - `InstallController` (`/install`, gated by `INSTALLER_KEY` in `.env`) writes `storage/app/isoadmin_installed.lock` (checked by `EnsureInstalled`) and creates the core schema — but only the pre-v2.5 tables (users, RBAC, departments, profiles, employee documents, attendance, vehicles/fuel/documents/services, dashboard widgets, leave types). `system_settings`, `leave_requests`, `public_holidays`, `vehicle_tracking_snapshots`, `quick_action_preferences`, `customers` and later columns exist only via updaters, so a fresh install must still run the v2.5+ updaters.
 - Code must tolerate partially-updated databases: controllers, views and the nav in `layouts/app.blade.php` check `Schema::hasTable` / `hasColumn` before touching optional tables/columns. Keep doing this for anything new.
 - `AttendanceCsvImporter::ensureRawRecordDetailColumns()` alters `attendance_raw_records` at import time — schema changes are not confined to `UpdateController`.
@@ -18,7 +18,14 @@ Production is **shared hosting with no console access** (no Composer, NPM, Vite 
 - One-off repair scripts live in `public/*.php` (key-protected via `?key=`, run once then deleted), e.g. route-cache clearing and Blade hotfixes.
 - Scheduled work is DirectAdmin cron hitting key-protected URLs, not `artisan schedule`: `/attendance-email-import/{key}` (`ATTENDANCE_IMPORT_KEY`), `/document-reminders/send/{key}` (`DOCUMENT_REMINDER_KEY`, mails `DOCUMENT_REMINDER_EMAIL_TO`), `/vehicle-tracking/sync/{key}` (`cartrack_cron_key` system setting). Keys are compared with `hash_equals`.
 - Several controllers/services read `env()` directly (attendance mailbox, reminder keys, installer key) rather than via `config()`, so `php artisan config:cache` would break them.
-- Each release bumps `VERSION`, adds a `README_V<x>_<y>_<z>_<TOPIC>.md` listing changed files and apply steps, and usually a `CHANGELOG.md` entry. (`app/Support/PlatformVersion.php` is stale at 2.4.0; the DB `platform_version` setting is what updaters maintain and the layout footer shows.)
+- Larger releases also add a `README_V<x>_<y>_<z>_<TOPIC>.md` with upload/apply steps for the operator.
+
+### Versioning (required on every change)
+
+- The `VERSION` file (a bare `MAJOR.MINOR.PATCH`) is the **only** place the version is stored. Read it with `App\Support\PlatformVersion::current()`; never hardcode a version string in PHP or Blade, and never write one to the database (`system_settings.platform_version` is a legacy row that nothing reads; updaters no longer set it).
+- **Every change bumps the patch number** in `VERSION` (e.g. `2.8.6` → `2.8.7`), unless the user asks for a minor/major bump. Bump once per change set or PR, not once per commit.
+- **Every bump gets a `CHANGELOG.md` entry** at the top, headed `## vX.Y.Z` (optionally followed by a short title), describing what changed, whether a web updater must be run, and the list of changed files to upload.
+- `tests/Unit/PlatformVersionTest.php` fails if `VERSION` isn't semver or the newest `## v…` heading in `CHANGELOG.md` doesn't match it.
 
 ### Code and docs are out of sync
 

@@ -14,7 +14,7 @@ class SettingsController extends Controller
     public function index()
     {
         return view('settings.index', [
-            'version' => PlatformVersion::VERSION,
+            'version' => PlatformVersion::current(),
             'settings' => [
                 'attendance.work_start' => PlatformSetting::getValue('attendance.work_start', '06:00'),
                 'attendance.work_end' => PlatformSetting::getValue('attendance.work_end', '15:00'),
