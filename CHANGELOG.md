@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.9.0
+
+WhatsApp Business integration (Meta WhatsApp Cloud API). See `README_V2_9_0_WHATSAPP_BUSINESS.md`.
+
+- Shared WhatsApp inbox with live refresh, delivery/read ticks, media, templates and 24-hour service window enforcement.
+- Signed webhook receiver for inbound messages and delivery statuses; STOP/START consent keywords; optional auto-reply.
+- Employee opt-in directory with bulk consent recording.
+- Template sync from Meta (positional and named parameters).
+- Broadcasts to employees, departments or roles (opted-in only), with personalisation and delivery stats.
+- Automatic notifications: leave approved/declined, employee document expiry, vehicle document expiry to assigned driver.
+- Cron URL for queued sends, retries and reminders; settings page with encrypted credentials and connection test.
+- New `WhatsApp` permission module; self-contained provider and routes so existing files are not replaced.
+- One-use `public/iso-whatsapp-v290-activate.php` patches the live layout and provider list in place.
+
 ## v2.8.0 Foreign Key Hotfix
 
 - Fixed MySQL error `1059 Identifier name is too long` during the v2.8.0 update.
