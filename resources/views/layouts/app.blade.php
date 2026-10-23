@@ -85,6 +85,7 @@
             str_starts_with($routeName, 'vehicle_tracking') => '🛰️',
             str_starts_with($routeName, 'vehicles') => '🚗',
             str_starts_with($routeName, 'cron_jobs') => '⚙️',
+            str_starts_with($routeName, 'whatsapp') => '💬',
             str_starts_with($routeName, 'vehicle_tracking.settings') => '🛰️',
             str_starts_with($routeName, 'google_api_settings') => '🗺️',
             str_starts_with($routeName, 'core_settings') => '🔧',
@@ -138,6 +139,10 @@
                 @endif
                 @if($currentUser->hasPermission('vehicle_tracking.view') && \Illuminate\Support\Facades\Schema::hasTable('vehicle_tracking_snapshots'))
                     <a href="{{ route('vehicle_tracking.index') }}" class="{{ request()->routeIs('vehicle_tracking.index') ? 'active' : '' }}"><span class="nav-icon">🛰️</span><span class="nav-text"><strong>Vehicle Tracking</strong><span>Cartrack API sync</span></span></a>
+                @endif
+                @if(\Illuminate\Support\Facades\Route::has('whatsapp.inbox') && $currentUser->hasPermission('whatsapp.view') && \Illuminate\Support\Facades\Schema::hasTable('whatsapp_contacts'))
+                    @php($whatsappUnread = (int) \App\Models\WhatsAppContact::sum('unread_count'))
+                    <a href="{{ route('whatsapp.inbox') }}" class="{{ request()->routeIs('whatsapp.*') ? 'active' : '' }}"><span class="nav-icon">💬</span><span class="nav-text"><strong>WhatsApp{{ $whatsappUnread > 0 ? ' (' . $whatsappUnread . ')' : '' }}</strong><span>Business inbox</span></span></a>
                 @endif
                 @if($currentUser->hasPermission('employee_documents.view') && \Illuminate\Support\Facades\Schema::hasTable('employee_documents'))
                     <a href="{{ route('employee_documents.reminders') }}" class="{{ request()->routeIs('employee_documents.*') ? 'active' : '' }}"><span class="nav-icon">📄</span><span class="nav-text"><strong>Document Reminders</strong><span>Expiring records</span></span></a>
