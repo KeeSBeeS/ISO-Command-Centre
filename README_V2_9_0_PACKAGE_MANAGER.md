@@ -122,7 +122,7 @@ Release notes and migrations go in `package-releases/<version>/`. See `package-r
 php tools/build-package.php --version=2.9.1 --base=<git ref of the installed release>
 ```
 
-This writes `dist/iso-command-centre-2.9.1.isopkg`. The package contains every file changed since `--base`, and files deleted in git are removed on install. Use `--files=a,b` to add individual files from the working tree.
+This writes `dist/iso-command-centre-2.9.1.isopkg`. Add `--ext=zip` to get `dist/iso-command-centre-2.9.1.zip` instead; the contents are identical, and the Package Manager accepts both. The package contains every file changed since `--base`, and files deleted in git are removed on install. Use `--files=a,b` to add individual files from the working tree.
 
 ## Installing v2.9.0 itself
 

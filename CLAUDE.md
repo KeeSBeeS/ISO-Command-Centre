@@ -13,6 +13,13 @@ ISO Admin Command Framework (isoadmin.co.za): a Laravel 11 admin platform for em
    - changes to permissions or security.
 
    The plan covers the approach, the files to add or change, any database changes, how it will be delivered (package or ZIP), and the risks. Small fixes and small, clearly scoped changes do not need a plan.
+3. **Always deliver a ZIP for the Package Manager.** Whenever you make an update package, also build it as a `.zip` and send that file to the user so they can upload it straight to **Admin → Package Manager**. Build it with:
+
+   ```
+   php tools/build-package.php --version=X.Y.Z --base=<last release> --ext=zip
+   ```
+
+   This produces `dist/iso-command-centre-X.Y.Z.zip`. Check it with `PackageArchive::open()` before sending, and say in your reply which version it installs and what version it requires.
 
 ## Hosting and deployment constraints
 
@@ -26,7 +33,7 @@ ISO Admin Command Framework (isoadmin.co.za): a Laravel 11 admin platform for em
 From v2.9.0 on, updates are `.isopkg` packages installed through **Admin → Package Manager**. Build one with:
 
 ```
-php tools/build-package.php --version=X.Y.Z --base=<git ref of last release>
+php tools/build-package.php --version=X.Y.Z --base=<git ref of last release> --ext=zip
 ```
 
 - Release notes and migrations go in `package-releases/<version>/`. See `package-releases/_example/` for the layout.

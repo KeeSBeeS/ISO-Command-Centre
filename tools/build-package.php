@@ -15,6 +15,7 @@
  *   --files=a,b       Extra files to include, read from the working tree.
  *   --release-dir=DIR Release notes / migrations folder (default package-releases/<version>).
  *   --out=DIR         Output folder (default dist).
+ *   --ext=EXT         Output file extension: isopkg (default) or zip. Both upload to the Package Manager.
  *   --sign-key=KEY    Sign the package (default: PACKAGE_SIGNING_KEY environment variable).
  *
  * The release folder may contain:
@@ -35,10 +36,10 @@ const EXCLUDED_FILES = ['VERSION', 'phpunit.xml', '.editorconfig', '.gitattribut
 $root = dirname(__DIR__);
 chdir($root);
 
-$options = getopt('', ['version:', 'base:', 'head:', 'files:', 'release-dir:', 'out:', 'sign-key:', 'help']);
+$options = getopt('', ['version:', 'base:', 'head:', 'files:', 'release-dir:', 'out:', 'ext:', 'sign-key:', 'help']);
 
 if (isset($options['help']) || empty($options['version'])) {
-    fwrite(STDERR, "Usage: php tools/build-package.php --version=X.Y.Z (--base=REF | --files=a,b) [--head=REF] [--release-dir=DIR] [--out=DIR] [--sign-key=KEY]\n");
+    fwrite(STDERR, "Usage: php tools/build-package.php --version=X.Y.Z (--base=REF | --files=a,b) [--head=REF] [--release-dir=DIR] [--out=DIR] [--ext=isopkg|zip] [--sign-key=KEY]\n");
     exit(isset($options['help']) ? 0 : 1);
 }
 
@@ -96,6 +97,10 @@ if (!PackageArchive::isValidVersion($version)) {
 $head = (string) ($options['head'] ?? 'HEAD');
 $releaseDirectory = rtrim((string) ($options['release-dir'] ?? "package-releases/{$version}"), '/');
 $outDirectory = rtrim((string) ($options['out'] ?? 'dist'), '/');
+$extension = (string) ($options['ext'] ?? PackageArchive::EXTENSION);
+if (!in_array($extension, [PackageArchive::EXTENSION, 'zip'], true)) {
+    fail('--ext must be isopkg or zip.');
+}
 $signKey = (string) ($options['sign-key'] ?? getenv('PACKAGE_SIGNING_KEY') ?: '');
 
 $release = [];
@@ -141,7 +146,7 @@ if ($sources === [] && $deletes === [] && $migrations === []) {
     fail('Nothing to package. Pass --base and/or --files, or add migrations to the release folder.');
 }
 
-$zipPath = "{$outDirectory}/iso-command-centre-{$version}." . PackageArchive::EXTENSION;
+$zipPath = "{$outDirectory}/iso-command-centre-{$version}.{$extension}";
 if (!is_dir($outDirectory)) {
     mkdir($outDirectory, 0755, true);
 }
