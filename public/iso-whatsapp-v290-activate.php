@@ -12,7 +12,7 @@ declare(strict_types=1);
  *
  * 1. Change ISO_ACTIVATE_KEY below to your own long random value before uploading.
  * 2. Open /iso-whatsapp-v290-activate.php?key=YOUR_KEY
- * 3. Delete this file immediately after it reports SUCCESS.
+ * 3. The file deletes itself after SUCCESS. If it reports that it could not, delete it manually.
  */
 const ISO_ACTIVATE_KEY = 'CHANGE-ME';
 
@@ -212,4 +212,10 @@ foreach ($backups as $backup) {
     echo "- {$backup}\n";
 }
 echo "\nNext: open /updates/v2-9-0 and click Apply v2.9.0 Update.\n";
-echo "Delete this activation file now: " . __FILE__ . "\n";
+
+// The key is embedded in this file, so it removes itself once the work is done.
+if (@unlink(__FILE__)) {
+    echo "This activation file has deleted itself.\n";
+} else {
+    echo "Could not delete this activation file. Delete it now: " . __FILE__ . "\n";
+}
