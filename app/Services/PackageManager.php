@@ -136,12 +136,12 @@ class PackageManager
 
     public function signingKey(): string
     {
-        return (string) config('services.packages.signing_key', '');
+        return (string) config('packages.signing_key', '');
     }
 
     public function rescueEnabled(): bool
     {
-        return (string) config('services.packages.rescue_key', '') !== '';
+        return (string) config('packages.rescue_key', '') !== '';
     }
 
     public function uploadLimitBytes(): int

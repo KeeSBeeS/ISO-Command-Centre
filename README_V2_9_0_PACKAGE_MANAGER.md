@@ -126,4 +126,17 @@ This writes `dist/iso-command-centre-2.9.1.isopkg`. The package contains every f
 
 ## Installing v2.9.0 itself
 
-v2.9.0 ships the Package Manager, so upload it once using your current method. Then open **Admin → Package Manager**: the tables and the `packages.manage` permission are created automatically on the first visit. Every update after that is installed through the Package Manager.
+v2.9.0 ships the Package Manager, so it is installed once by hand:
+
+1. Upload the contents of `iso-admin-v2.9.0-package-manager.zip` into the application root (the folder that contains `app/`, `routes/` and `public/`), keeping the folder structure. The ZIP only adds new files and `VERSION`. It does **not** replace `routes/web.php`, the layout or any existing module.
+2. Open `https://isoadmin.co.za/public/iso-package-manager-setup.php?key=iso-package-manager-setup-2026`. The script:
+   - appends `require __DIR__ . '/packages.php';` to the end of `routes/web.php`
+   - adds the Package Manager link to the Admin menu, above Logout
+   - backs up both files first (`*.bak-<date>`)
+   - clears the caches.
+
+   It is safe to run more than once.
+3. Open **Admin → Package Manager**. On this first visit, the database tables and the `packages.manage` permission are created and the version is set to 2.9.0.
+4. Delete `public/iso-package-manager-setup.php`.
+
+Every update after this one is installed through the Package Manager.
