@@ -1,0 +1,13 @@
+{
+    "title": "ISO Command Centre v2.9.1",
+    "description": "One-paragraph summary shown on the Review & Install page.",
+    "requires": {
+        "min_version": "2.9.0",
+        "php": "8.2.0",
+        "extensions": ["zip"]
+    },
+    "changelog": [
+        "Describe each change on its own line."
+    ],
+    "delete": []
+}

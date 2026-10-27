@@ -1,0 +1,20 @@
+{
+    "title": "ISO Command Centre v2.9.1 · WhatsApp Business",
+    "description": "Adds the WhatsApp Business module (Meta WhatsApp Cloud API): shared inbox, templates, media, broadcasts, employee opt-ins and automatic notifications. The install creates the WhatsApp tables, settings and permissions and adds WhatsApp to bootstrap/providers.php and the menu (backups are kept). Roll Back removes all of it, including WhatsApp messages and contacts.",
+    "requires": {
+        "min_version": "2.9.0",
+        "php": "8.2.0",
+        "extensions": ["curl", "openssl", "mbstring"]
+    },
+    "changelog": [
+        "Shared WhatsApp inbox with live refresh, sent/delivered/read ticks, media, templates and 24-hour service window enforcement.",
+        "Signed webhook receiver for inbound messages and delivery statuses; STOP/START consent keywords; optional auto-reply.",
+        "Employee opt-in directory with bulk consent recording.",
+        "Template sync from Meta (positional and named parameters).",
+        "Broadcasts to employees, departments or roles (opted-in only), with personalisation and delivery stats.",
+        "Automatic notifications: leave approved/declined, employee document expiry, vehicle document expiry to the assigned driver.",
+        "Cron URL for queued sends, retries and reminders. Settings page with encrypted credentials and a connection test.",
+        "New WhatsApp permission module. System Administrator gets all; Directors get inbox, opt-ins, broadcasts and templates; Managers get inbox and replies."
+    ],
+    "delete": []
+}

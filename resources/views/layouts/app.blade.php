@@ -90,6 +90,7 @@
             str_starts_with($routeName, 'core_settings') => '🔧',
             str_starts_with($routeName, 'leave_types') => '🗓️',
             str_starts_with($routeName, 'updates') => '⬆️',
+            str_starts_with($routeName, 'packages') => '📦',
             default => '⌂',
         };
     @endphp
@@ -146,6 +147,9 @@
                 <div class="nav-section-label">Admin</div>
                 @if($currentUser->hasPermission('cron_jobs.view'))
                     <a href="{{ route('cron_jobs.index') }}" class="{{ request()->routeIs('cron_jobs.*') ? 'active' : '' }}"><span class="nav-icon">⚙️</span><span class="nav-text"><strong>Cron Jobs</strong><span>Automation tasks</span></span></a>
+                @endif
+                @if($currentUser->hasPermission('packages.manage'))
+                    <a href="{{ route('packages.index') }}" class="{{ request()->routeIs('packages.*') ? 'active' : '' }}"><span class="nav-icon">📦</span><span class="nav-text"><strong>Package Manager</strong><span>Updates and rollbacks</span></span></a>
                 @endif
                 @if($currentUser->hasAnyPermission(['core_settings.view','google_api_settings.view','vehicle_tracking.settings.view','leave_types.view','settings.manage']))
                     @if($currentUser->hasRole('system-administrator') && $currentUser->hasPermission('core_settings.view') && \Illuminate\Support\Facades\Schema::hasTable('system_settings'))
