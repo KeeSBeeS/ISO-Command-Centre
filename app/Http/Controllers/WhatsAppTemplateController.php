@@ -11,7 +11,7 @@ class WhatsAppTemplateController extends Controller
 {
     public function index(WhatsAppSettings $settings)
     {
-        abort_unless($settings->installed(), 404, 'Run the v2.9.0 update first.');
+        abort_unless($settings->installed(), 404, 'Install the v2.9.1 WhatsApp package first.');
 
         $notificationTemplates = array_filter([
             'Leave decision' => $settings->get('whatsapp_leave_template'),

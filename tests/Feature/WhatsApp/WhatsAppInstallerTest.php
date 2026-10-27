@@ -5,6 +5,7 @@ namespace Tests\Feature\WhatsApp;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\SystemSetting;
+use App\Services\WhatsApp\WhatsAppActivation;
 use App\Services\WhatsApp\WhatsAppInstaller;
 use App\Services\WhatsApp\WhatsAppSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,19 +16,29 @@ class WhatsAppInstallerTest extends TestCase
 {
     use RefreshDatabase, InteractsWithWhatsApp;
 
+    private const MIGRATION = 'package-releases/2.9.1/migrations/2026_10_27_000001_install_whatsapp_business.php';
+
+    private ?string $sandbox = null;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->setUpPlatform();
     }
 
+    protected function tearDown(): void
+    {
+        if ($this->sandbox) {
+            exec('rm -rf ' . escapeshellarg($this->sandbox));
+        }
+        parent::tearDown();
+    }
+
     public function test_install_creates_tables_settings_and_permissions(): void
     {
-        SystemSetting::create(['key' => 'platform_version', 'group' => 'Identity', 'label' => 'Platform Version', 'value' => '2.8.5']);
-
         $this->app->make(WhatsAppInstaller::class)->install();
 
-        foreach (['whatsapp_contacts', 'whatsapp_messages', 'whatsapp_templates', 'whatsapp_broadcasts', 'whatsapp_webhook_events'] as $table) {
+        foreach (WhatsAppInstaller::TABLES as $table) {
             $this->assertTrue(Schema::hasTable($table), $table);
         }
 
@@ -36,8 +47,6 @@ class WhatsAppInstallerTest extends TestCase
         $this->assertTrue(Role::where('slug', 'director')->first()->permissions()->where('slug', 'whatsapp.broadcast')->exists());
         $this->assertFalse(Role::where('slug', 'director')->first()->permissions()->where('slug', 'whatsapp.settings.manage')->exists());
         $this->assertFalse(Role::where('slug', 'employee')->first()->permissions()->exists());
-
-        $this->assertSame('2.9.0', SystemSetting::where('key', 'platform_version')->value('value'));
         $this->assertSame(40, strlen((string) SystemSetting::where('key', 'whatsapp_cron_key')->value('value')));
     }
 
@@ -61,15 +70,6 @@ class WhatsAppInstallerTest extends TestCase
         $this->assertFalse($director->permissions()->where('slug', 'whatsapp.broadcast')->exists());
     }
 
-    public function test_install_does_not_downgrade_newer_platform_version(): void
-    {
-        SystemSetting::create(['key' => 'platform_version', 'group' => 'Identity', 'label' => 'Platform Version', 'value' => '3.0.0']);
-
-        $this->app->make(WhatsAppInstaller::class)->install();
-
-        $this->assertSame('3.0.0', SystemSetting::where('key', 'platform_version')->value('value'));
-    }
-
     public function test_secrets_are_encrypted_at_rest(): void
     {
         $settings = $this->installWhatsApp();
@@ -79,13 +79,82 @@ class WhatsAppInstallerTest extends TestCase
         $this->assertSame('test-token', $settings->get('whatsapp_access_token'));
     }
 
-    public function test_setup_page_runs_for_system_administrator(): void
+    public function test_package_migration_installs_and_rolls_back_cleanly(): void
     {
-        $admin = $this->makeUser('system-administrator');
+        SystemSetting::create(['key' => 'core_unrelated', 'group' => 'Core', 'label' => 'Unrelated', 'value' => 'keep']);
+        $live = $this->makeLiveSandbox();
+        $originalProviders = file_get_contents($live . '/bootstrap/providers.php');
+        $originalLayout = file_get_contents($live . '/resources/views/layouts/app.blade.php');
 
-        $this->actingAs($admin)->get('/updates/v2-9-0')->assertOk()->assertSee('Apply v2.9.0 Update');
-        $this->actingAs($admin)->post('/updates/v2-9-0')->assertRedirect('/updates/v2-9-0');
+        $migration = require base_path(self::MIGRATION);
+        $this->app->setBasePath($live);
 
+        $migration->up();
+        $migration->up(); // idempotent
+
+        $providers = file_get_contents($live . '/bootstrap/providers.php');
+        $layout = file_get_contents($live . '/resources/views/layouts/app.blade.php');
+        $this->assertSame(1, substr_count($providers, 'WhatsAppServiceProvider::class) ?'));
+        $this->assertContains(\App\Providers\WhatsAppServiceProvider::class, require $live . '/bootstrap/providers.php');
+        $this->assertSame(1, substr_count($layout, "route('whatsapp.inbox')"));
+        $this->assertStringContainsString('LIVE-ONLY Compliance', $layout);
+        $this->assertLessThan(strpos($layout, '<div class="nav-section-label">Admin</div>'), strpos($layout, WhatsAppActivation::MENU_START));
+        $this->assertStringContainsString("str_starts_with(\$routeName, 'whatsapp')", $layout);
+        $this->assertNotEmpty(glob($live . '/bootstrap/providers.php.bak-*'));
         $this->assertTrue(Schema::hasTable('whatsapp_messages'));
+
+        $migration->down();
+
+        $this->assertSame($originalProviders, file_get_contents($live . '/bootstrap/providers.php'));
+        $this->assertSame($originalLayout, file_get_contents($live . '/resources/views/layouts/app.blade.php'));
+        foreach (WhatsAppInstaller::TABLES as $table) {
+            $this->assertFalse(Schema::hasTable($table), $table);
+        }
+        $this->assertSame(0, Permission::where('slug', 'like', 'whatsapp.%')->count());
+        $this->assertSame(0, SystemSetting::where('key', 'like', 'whatsapp_%')->count());
+        $this->assertSame('keep', SystemSetting::where('key', 'core_unrelated')->value('value'));
+    }
+
+    public function test_guarded_provider_entry_survives_missing_module_files(): void
+    {
+        $live = $this->makeLiveSandbox();
+        (new WhatsAppActivation($live))->add();
+
+        $code = str_replace('App\\Providers\\WhatsAppServiceProvider', 'App\\Providers\\RemovedByRescueProvider', file_get_contents($live . '/bootstrap/providers.php'));
+        file_put_contents($live . '/bootstrap/providers.php', $code);
+
+        $this->assertSame([\App\Providers\AppServiceProvider::class], require $live . '/bootstrap/providers.php');
+    }
+
+    public function test_legacy_activation_script_line_is_replaced_by_guarded_block(): void
+    {
+        $live = $this->makeLiveSandbox("<?php\n\nreturn [\n    App\\Providers\\AppServiceProvider::class,\n    App\\Providers\\WhatsAppServiceProvider::class,\n];\n");
+
+        (new WhatsAppActivation($live))->add();
+
+        $providers = file_get_contents($live . '/bootstrap/providers.php');
+        $this->assertSame(1, substr_count($providers, 'WhatsAppServiceProvider::class) ?'));
+        $this->assertSame(2, substr_count($providers, 'WhatsAppServiceProvider::class'));
+        $this->assertSame([\App\Providers\AppServiceProvider::class, \App\Providers\WhatsAppServiceProvider::class], require $live . '/bootstrap/providers.php');
+    }
+
+    /**
+     * A copy of the live files the package patches: the repo layout plus a menu item that only exists live.
+     */
+    private function makeLiveSandbox(?string $providers = null): string
+    {
+        $this->sandbox = sys_get_temp_dir() . '/wa-live-' . bin2hex(random_bytes(4));
+        mkdir($this->sandbox . '/bootstrap', 0755, true);
+        mkdir($this->sandbox . '/resources/views/layouts', 0755, true);
+
+        file_put_contents($this->sandbox . '/bootstrap/providers.php', $providers ?? file_get_contents(base_path('bootstrap/providers.php')));
+        $layout = str_replace(
+            '<div class="nav-section-label">Admin</div>',
+            "<a href=\"/compliance\">LIVE-ONLY Compliance</a>\n                <div class=\"nav-section-label\">Admin</div>",
+            file_get_contents(base_path('resources/views/layouts/app.blade.php'))
+        );
+        file_put_contents($this->sandbox . '/resources/views/layouts/app.blade.php', $layout);
+
+        return $this->sandbox;
     }
 }

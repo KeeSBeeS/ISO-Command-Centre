@@ -1,10 +1,10 @@
-# ISO Admin Command Framework v2.9.0
+# ISO Admin Command Framework v2.9.1
 
 ## WhatsApp Business Integration
 
 Adds a full WhatsApp Business module using Meta's official **WhatsApp Cloud API**: a shared team inbox, template messages, media, broadcasts, employee opt-in management and automatic notifications for leave decisions and expiring documents.
 
-The module is self-contained. It does **not** replace `routes/web.php`, `UpdateController.php` or any existing controller, so v2.7/v2.8 code on the live server is untouched.
+Delivered as a **Package Manager** package (`iso-command-centre-2.9.1.zip`) that requires v2.9.0. It does **not** replace `routes/web.php`, the layout, `UpdateController.php` or any existing controller, so v2.7/v2.8 code on the live server is untouched.
 
 ## Added
 
@@ -45,34 +45,29 @@ The module is self-contained. It does **not** replace `routes/web.php`, `UpdateC
 
 Defaults are applied only the first time a permission is created. Later changes on the Permissions page are kept when the update is run again.
 
-## New files
+## Install with the Package Manager
 
-- `app/Providers/WhatsAppServiceProvider.php`
-- `routes/whatsapp.php`
-- `app/Http/Controllers/WhatsApp*Controller.php` (8 controllers)
-- `app/Models/WhatsApp*.php` (5 models)
-- `app/Services/WhatsApp/*` (Cloud API client, messenger, webhook processor, notifier, broadcaster, template sync, settings, installer, phone number normaliser)
-- `resources/views/whatsapp/**`
-- `public/iso-whatsapp-v290-activate.php` (one-use activation script)
-- `tests/Feature/WhatsApp/*`, `tests/Unit/WhatsAppPhoneNumberTest.php`
+1. **Admin → Package Manager** → **Upload Package** → choose `iso-command-centre-2.9.1.zip` → Upload.
+2. **Review & Install**. All checks must be green: it needs v2.9.0 installed and PHP 8.2 with `curl`, `openssl` and `mbstring`.
+3. Tick the confirmation box and press **Install**. The install:
+   - adds the WhatsApp files (no existing file is replaced)
+   - runs the migration `2026_10_27_000001_install_whatsapp_business`, which
+     - creates the `whatsapp_*` tables, the WhatsApp settings and the WhatsApp permissions
+     - adds the WhatsApp provider to the live `bootstrap/providers.php` and the WhatsApp link to the live menu, keeping `.bak-` copies of both
+   - sets the version to 2.9.1.
+4. Reload the page. **WhatsApp** appears in the menu above Admin. If your live menu has no *Admin* heading or logout form, the link is skipped; open `/whatsapp` directly.
 
-## Changed files (repo copies)
+### Rolling back
 
-- `bootstrap/providers.php`: registers `WhatsAppServiceProvider`
-- `resources/views/layouts/app.blade.php`: WhatsApp menu link with unread count, and page icon
-- `VERSION`, `CHANGELOG.md`, `phpunit.xml` (test database only)
+**Install History → Details / Rollback → Roll Back** removes the files, the provider entry and the menu link, and **drops the WhatsApp tables**. All WhatsApp messages, contacts, opt-ins and settings are deleted. Downloaded media files stay in `storage/app/private/whatsapp/`.
 
-> **Do not upload `bootstrap/providers.php` or `resources/views/layouts/app.blade.php` from this repo over the live server.** The live layout has v2.7/v2.8 menu items that are not in this repo. Use the activation script below, which adds the WhatsApp entries into the live files.
+The provider entry is wrapped in `class_exists()`, so the site still loads if the emergency rescue script restores files without running the rollback.
 
-## Apply (no command line required)
+## Files
 
-1. Back up the site files and database.
-2. Upload the **new files** listed above, keeping the folder structure.
-3. Edit `public/iso-whatsapp-v290-activate.php` and change `ISO_ACTIVATE_KEY` from `CHANGE-ME` to your own long random value (16+ characters).
-4. Open `https://isoadmin.co.za/iso-whatsapp-v290-activate.php?key=YOUR_KEY`.
-   It registers the provider, adds the WhatsApp menu link to the live layout (with `.bak-` backups), clears compiled views and caches, and can be run more than once safely.
-5. **Delete `public/iso-whatsapp-v290-activate.php`** once it reports `SUCCESS`.
-6. Log in as System Administrator and open `https://isoadmin.co.za/updates/v2-9-0`, then click **Apply v2.9.0 Update**.
+- New: `app/Providers/WhatsAppServiceProvider.php`, `routes/whatsapp.php`, `app/Http/Controllers/WhatsApp*Controller.php` (7), `app/Models/WhatsApp*.php` (5), `app/Services/WhatsApp/*` (11), `resources/views/whatsapp/**`.
+- Migration: `package-releases/2.9.1/migrations/2026_10_27_000001_install_whatsapp_business.php`.
+- Patched in place on the live site (not shipped): `bootstrap/providers.php`, `resources/views/layouts/app.blade.php`.
 
 ## Meta / WhatsApp setup
 

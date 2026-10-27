@@ -4,7 +4,6 @@ use App\Http\Controllers\WhatsAppBroadcastController;
 use App\Http\Controllers\WhatsAppContactController;
 use App\Http\Controllers\WhatsAppInboxController;
 use App\Http\Controllers\WhatsAppSettingController;
-use App\Http\Controllers\WhatsAppSetupController;
 use App\Http\Controllers\WhatsAppTemplateController;
 use App\Http\Middleware\CheckPermission;
 use App\Http\Middleware\EnsureInstalled;
@@ -12,19 +11,12 @@ use App\Http\Middleware\ForcePasswordChange;
 use Illuminate\Support\Facades\Route;
 
 /*
-| WhatsApp Business module routes (v2.9.0). Loaded by WhatsAppServiceProvider inside the "web"
+| WhatsApp Business module routes (v2.9.1). Loaded by WhatsAppServiceProvider inside the "web"
 | middleware group so routes/web.php does not need to change. The public webhook and cron
 | endpoints are registered separately by the provider without session/CSRF middleware.
 */
 
 Route::middleware([EnsureInstalled::class, 'auth', ForcePasswordChange::class])->group(function () {
-    Route::get('/updates/v2-9-0', [WhatsAppSetupController::class, 'show'])
-        ->middleware(CheckPermission::class . ':settings.manage')
-        ->name('updates.v2_9_0');
-    Route::post('/updates/v2-9-0', [WhatsAppSetupController::class, 'apply'])
-        ->middleware(CheckPermission::class . ':settings.manage')
-        ->name('updates.v2_9_0.apply');
-
     Route::get('/whatsapp', [WhatsAppInboxController::class, 'index'])
         ->middleware(CheckPermission::class . ':whatsapp.view')
         ->name('whatsapp.inbox');

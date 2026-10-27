@@ -1,8 +1,8 @@
 # Changelog
 
-## v2.9.0
+## v2.9.1
 
-WhatsApp Business integration (Meta WhatsApp Cloud API). See `README_V2_9_0_WHATSAPP_BUSINESS.md`.
+WhatsApp Business integration (Meta WhatsApp Cloud API). See `README_V2_9_1_WHATSAPP_BUSINESS.md`.
 
 - Shared WhatsApp inbox with live refresh, delivery/read ticks, media, templates and 24-hour service window enforcement.
 - Signed webhook receiver for inbound messages and delivery statuses; STOP/START consent keywords; optional auto-reply.
@@ -12,7 +12,16 @@ WhatsApp Business integration (Meta WhatsApp Cloud API). See `README_V2_9_0_WHAT
 - Automatic notifications: leave approved/declined, employee document expiry, vehicle document expiry to assigned driver.
 - Cron URL for queued sends, retries and reminders; settings page with encrypted credentials and connection test.
 - New `WhatsApp` permission module; self-contained provider and routes so existing files are not replaced.
-- One-use `public/iso-whatsapp-v290-activate.php` patches the live layout and provider list in place.
+- Delivered as a Package Manager package (requires v2.9.0). Its migration creates the tables, settings and permissions and patches the live provider list and menu with backups; Roll Back reverses all of it.
+
+## v2.9.0 Package Manager
+
+- Added Admin → Package Manager for uploading, reviewing, installing and rolling back `.isopkg` update packages.
+- Every install backs up changed files, writes files atomically, runs package migrations and reverts itself automatically on failure.
+- One-click rollback per install (newer installs are rolled back first), including migration `down()` and version restore.
+- Drop folder (`storage/app/package-manager/incoming/`) for packages larger than the upload limit.
+- Optional package signing (`PACKAGE_SIGNING_KEY`) and emergency file rescue script (`PACKAGE_RESCUE_KEY`, `public/iso-package-rescue.php`).
+- Added `tools/build-package.php` to build update packages from git.
 
 ## v2.8.0 Foreign Key Hotfix
 

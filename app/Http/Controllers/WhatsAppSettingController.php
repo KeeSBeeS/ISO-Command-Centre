@@ -21,7 +21,7 @@ class WhatsAppSettingController extends Controller
 
     public function index(WhatsAppSettings $settings)
     {
-        abort_unless($settings->installed(), 404, 'Run the v2.9.0 update first.');
+        abort_unless($settings->installed(), 404, 'Install the v2.9.1 WhatsApp package first.');
 
         return view('whatsapp.settings', [
             'settings' => $settings,
@@ -33,7 +33,7 @@ class WhatsAppSettingController extends Controller
 
     public function update(Request $request, WhatsAppSettings $settings)
     {
-        abort_unless($settings->installed(), 404, 'Run the v2.9.0 update first.');
+        abort_unless($settings->installed(), 404, 'Install the v2.9.1 WhatsApp package first.');
 
         $data = $request->validate([
             'whatsapp_api_version' => ['required', 'regex:/^v\d+\.\d+$/'],

@@ -300,6 +300,6 @@ class WhatsAppInboxController extends Controller
 
     private function ensureInstalled(): void
     {
-        abort_unless($this->settings->installed(), 404, 'Run the v2.9.0 update first.');
+        abort_unless($this->settings->installed(), 404, 'Install the v2.9.1 WhatsApp package first.');
     }
 }

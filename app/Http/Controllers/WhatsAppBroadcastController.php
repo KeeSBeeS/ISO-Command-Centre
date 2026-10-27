@@ -15,7 +15,7 @@ class WhatsAppBroadcastController extends Controller
 {
     public function index(WhatsAppSettings $settings, WhatsAppBroadcaster $broadcaster)
     {
-        abort_unless($settings->installed(), 404, 'Run the v2.9.0 update first.');
+        abort_unless($settings->installed(), 404, 'Install the v2.9.1 WhatsApp package first.');
         $broadcaster->refreshAll();
 
         $broadcasts = WhatsAppBroadcast::with('creator')
@@ -34,7 +34,7 @@ class WhatsAppBroadcastController extends Controller
 
     public function create(WhatsAppSettings $settings)
     {
-        abort_unless($settings->installed(), 404, 'Run the v2.9.0 update first.');
+        abort_unless($settings->installed(), 404, 'Install the v2.9.1 WhatsApp package first.');
 
         return view('whatsapp.broadcasts.create', [
             // Broadcasts collect body parameters only, so templates with header variables are excluded.

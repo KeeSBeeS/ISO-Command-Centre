@@ -512,3 +512,5 @@ Route::middleware([EnsureInstalled::class])->group(function () {
         });
     });
 });
+
+require __DIR__ . '/packages.php';

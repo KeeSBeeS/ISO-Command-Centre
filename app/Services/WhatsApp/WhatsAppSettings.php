@@ -12,7 +12,7 @@ class WhatsAppSettings
     public const GROUP = 'WhatsApp';
 
     /**
-     * Setting definitions seeded by the v2.9.0 setup. Secrets are stored encrypted with the APP_KEY.
+     * Setting definitions seeded by the v2.9.1 package migration. Secrets are stored encrypted with the APP_KEY.
      */
     public const DEFINITIONS = [
         'whatsapp_enabled' => ['label' => 'Enable WhatsApp Business', 'type' => 'boolean', 'value' => '0', 'description' => 'Master switch for sending and receiving WhatsApp messages.'],

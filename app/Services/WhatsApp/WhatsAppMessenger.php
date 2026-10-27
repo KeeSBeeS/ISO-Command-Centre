@@ -341,7 +341,7 @@ class WhatsAppMessenger
     private function assertReady(): void
     {
         if (!$this->settings->installed()) {
-            throw new RuntimeException('WhatsApp is not installed yet. Run the v2.9.0 update first.');
+            throw new RuntimeException('WhatsApp is not installed yet. Install the v2.9.1 WhatsApp package first.');
         }
 
         if (!$this->settings->ready()) {

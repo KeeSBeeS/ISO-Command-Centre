@@ -11,12 +11,13 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
- * Web-run installer for v2.9.0 (no artisan on shared hosting). Safe to run repeatedly.
+ * Creates and removes the WhatsApp tables, settings and permissions. Run by the v2.9.1 package
+ * migration (install on up(), uninstall on down()). Safe to run repeatedly.
  * Foreign keys use short explicit names to stay under MySQL's 64 character identifier limit.
  */
 class WhatsAppInstaller
 {
-    public const VERSION = '2.9.0';
+    public const TABLES = ['whatsapp_messages', 'whatsapp_broadcasts', 'whatsapp_templates', 'whatsapp_webhook_events', 'whatsapp_contacts'];
 
     public const PERMISSIONS = [
         'whatsapp.view' => ['View WhatsApp Inbox', 'View WhatsApp conversations and message history.'],
@@ -40,20 +41,6 @@ class WhatsAppInstaller
     {
     }
 
-    public function status(): array
-    {
-        return [
-            'system_settings' => Schema::hasTable('system_settings'),
-            'whatsapp_contacts' => Schema::hasTable('whatsapp_contacts'),
-            'whatsapp_messages' => Schema::hasTable('whatsapp_messages'),
-            'whatsapp_templates' => Schema::hasTable('whatsapp_templates'),
-            'whatsapp_broadcasts' => Schema::hasTable('whatsapp_broadcasts'),
-            'whatsapp_webhook_events' => Schema::hasTable('whatsapp_webhook_events'),
-            'permissions' => Permission::whereIn('slug', array_keys(self::PERMISSIONS))->count() === count(self::PERMISSIONS),
-            'settings' => Schema::hasTable('system_settings') && SystemSetting::where('group', WhatsAppSettings::GROUP)->count() >= count(WhatsAppSettings::DEFINITIONS),
-        ];
-    }
-
     public function install(): void
     {
         if (!Schema::hasTable('system_settings')) {
@@ -63,7 +50,34 @@ class WhatsAppInstaller
         $this->createTables();
         $this->seedSettings();
         $this->seedPermissions();
-        $this->bumpVersion();
+    }
+
+    /**
+     * Reverses install(): drops the tables (all WhatsApp messages and contacts are lost) and
+     * removes the settings and permissions.
+     */
+    public function uninstall(): void
+    {
+        foreach (self::TABLES as $table) {
+            Schema::dropIfExists($table);
+        }
+
+        $permissionIds = Permission::whereIn('slug', array_keys(self::PERMISSIONS))->pluck('id');
+        if ($permissionIds->isNotEmpty()) {
+            DB::table('permission_role')->whereIn('permission_id', $permissionIds)->delete();
+            if (Schema::hasTable('permission_user')) {
+                DB::table('permission_user')->whereIn('permission_id', $permissionIds)->delete();
+            }
+            Permission::whereIn('id', $permissionIds)->delete();
+        }
+
+        if (Schema::hasTable('system_settings')) {
+            SystemSetting::where('group', WhatsAppSettings::GROUP)
+                ->orWhereIn('key', array_keys(WhatsAppSettings::DEFINITIONS))
+                ->delete();
+        }
+
+        $this->settings->flush();
     }
 
     private function createTables(): void
@@ -225,28 +239,5 @@ class WhatsAppInstaller
                 $role->permissions()->syncWithoutDetaching($ids);
             }
         }
-    }
-
-    private function bumpVersion(): void
-    {
-        $current = (string) SystemSetting::where('key', 'platform_version')->value('value');
-        if ($current !== '' && version_compare($current, self::VERSION, '>=')) {
-            return;
-        }
-
-        DB::table('system_settings')->updateOrInsert(
-            ['key' => 'platform_version'],
-            [
-                'group' => 'Identity',
-                'label' => 'Platform Version',
-                'value' => self::VERSION,
-                'type' => 'text',
-                'description' => 'Current ISO Admin Command Framework package version.',
-                'sort_order' => 5,
-                'is_core' => true,
-                'updated_at' => now(),
-                'created_at' => now(),
-            ]
-        );
     }
 }

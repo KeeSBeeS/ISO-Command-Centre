@@ -18,6 +18,11 @@ trait InteractsWithWhatsApp
 
     protected function setUpPlatform(): void
     {
+        // On live sites the package migration adds this provider to bootstrap/providers.php.
+        $this->app->register(\App\Providers\WhatsAppServiceProvider::class);
+        $this->app['router']->getRoutes()->refreshNameLookups();
+        $this->app['router']->getRoutes()->refreshActionLookups();
+
         Schema::table('users', function (Blueprint $table) {
             $table->string('employee_code')->nullable();
             $table->string('attendance_name')->nullable();
