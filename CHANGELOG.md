@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.9.0 Package Manager
+
+- Added Admin → Package Manager for uploading, reviewing, installing and rolling back `.isopkg` update packages.
+- Every install backs up changed files, writes files atomically, runs package migrations and reverts itself automatically on failure.
+- One-click rollback per install (newer installs are rolled back first), including migration `down()` and version restore.
+- Drop folder (`storage/app/package-manager/incoming/`) for packages larger than the upload limit.
+- Optional package signing (`PACKAGE_SIGNING_KEY`) and emergency file rescue script (`PACKAGE_RESCUE_KEY`, `public/iso-package-rescue.php`).
+- Added `tools/build-package.php` to build update packages from git.
+
 ## v2.8.0 Foreign Key Hotfix
 
 - Fixed MySQL error `1059 Identifier name is too long` during the v2.8.0 update.
