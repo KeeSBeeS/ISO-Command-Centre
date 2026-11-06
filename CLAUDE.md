@@ -29,7 +29,7 @@ The production target is **DirectAdmin shared hosting with no console access**. 
   - `UpdateController` and its `/updates/vX-Y-Z` pages are the pre-v3.0.0 updaters. Keep them for older sites, but don't add new ones.
 - **Code must tolerate a schema that is behind.** Controllers and services often check `Schema::hasTable`/`hasColumn` and fail gracefully, for example `abort_unless(Schema::hasTable('crm_clients'), 404, 'Run the v2.2 update first.')`. Keep that pattern.
 - **Scheduled jobs.** The old jobs are URL-triggered cron calls with secret keys: `/attendance-email-import/{key}`, `/document-reminders/send/{key}`, `/vehicle-tracking/sync/{key}`. From v3.0.0, `ISO_HOME/cron.php` also runs `schedule:run` every minute (`routes/console.php`; for example the hourly `iso:check-updates`).
-- **No frontend build.** The Vite/Tailwind/`package.json` files are leftover skeleton. Blade views (`resources/views/layouts/app.blade.php`) use inline CSS/JS and no `@vite`.
+- **No frontend build.** The Vite/Tailwind/`package.json` files are leftover skeleton; there is no `@vite`. Since v3.1.0 the look comes from one plain stylesheet, `public/css/iso.css` (the design system), loaded by `resources/views/layouts/app.blade.php` with `?v=<version>` so browsers fetch it again after every update. Release zips copy `public/` into the web folder, so the file reaches the site with each release.
 
 ### Server layout (v3.0.0+)
 
@@ -78,13 +78,21 @@ public_html/                 the web folder
 - `config('iso.version')` is `v` plus the `VERSION` file. Release folders and tags use the `v` form.
 - `DatabaseBackup` dumps MySQL in plain PHP. Restoring uses `iso_restore_backup()` from `tools.php.stub`, the same code `recovery.php` uses. Releases without `app/Updates/Updater.php` (v2.8.5 and older) can't be switched to from the page, only from `recovery.php`.
 - Events are logged to the Laravel log as `platform_update.*` (`UpdateLog`). There is no activity-log table.
+- `tests/Feature/EveryPageTest` opens every GET page as a System Administrator, after running every old `/updates/vX-Y-Z` step, and fails on any 500 or a page without the design system. Run it on MySQL too: `DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_DATABASE=... DB_USERNAME=... DB_PASSWORD=... php artisan test --filter=EveryPageTest`.
 - Tests: `tests/Support/FakeServer` builds a throwaway `ISO_HOME` plus web folder with stand-in releases, and runs the front door, `cron.php`, `recovery.php` and `iso-setup.php` in a separate PHP process. `tests/Support/InstallsIsoSchema` builds the schema through `InstallController`, as `/install` does. `DatabaseBackupTest` needs MySQL (`ISO_TEST_MYSQL_*`), and the release workflow provides it.
 
 ## Responsive design (required)
 
 - **Design for PC first.** Most people use the site on a desktop or laptop, so lay pages out for a wide screen first.
 - **Every page must still be fully usable on tablet and phone.** That covers every page, form, table and action, and it applies to every change, not only new pages.
-- **Use the layout's existing styles** in `resources/views/layouts/app.blade.php`: `.grid.cols-2` and `.grid.cols-4`, `.card`, `.actions`, `.btn` and `.table-wrap`. The layout already adapts at `1080px` (fewer columns), `960px` (the sidebar becomes a menu button) and `560px` (full-width buttons, smaller padding). Pages with their own inline styles need media queries at these same sizes.
+- **Use the design system** in `public/css/iso.css` rather than new one-off styles:
+  - layout: `.grid.cols-2/3/4`, `.actions`, `.page-head`, `.stack`;
+  - building blocks: `.card` (and `.card.flush` with `.card-head`), `.metric`, `.metric-box`, `.kv`;
+  - controls: `.btn` (`.primary`, `.danger`), `.pill` (`.warn`, `.danger`, `.info`, `.off`), `.alert` (`.success`, `.warning`, `.error`, `.info`);
+  - tables and forms: `.table-wrap`, `.form-grid`, `.form-row`, `.check`.
+
+  Colours come from its CSS variables (`--text`, `--muted`, `--line`, `--brand`, `--ok`/`--warn`/`--danger`/`--info` and their `-soft` backgrounds), never hard-coded dark-theme colours. Icons are `<x-icon name="..." />` (`resources/views/components/icon.blade.php`; add new ones there), never emoji in new work. The design system adapts at `1080px` (fewer columns), `960px` (the sidebar becomes a slide-in menu) and `560px` (full-width buttons, smaller padding). Pages with their own styles use media queries at these same sizes, and push them with `@push('head')`.
+- **The sidebar** is the `$navigation` list at the top of `layouts/app.blade.php`. Each link keeps its permission and table check; add new modules there.
 - **No sideways scrolling of the page.** A wide table goes in `.table-wrap`, which scrolls by itself. Long values such as URLs, keys and file names must wrap.
 - **Touch-friendly controls:** buttons and links must be large enough to tap, and nothing may depend on hover alone.
 - **Check every changed page** at phone width (about 390px), tablet width (about 820px) and PC width (1280px or more) before finishing.

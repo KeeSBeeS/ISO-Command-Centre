@@ -6,10 +6,10 @@
     <meta name="robots" content="noindex">
     <title>Finishing the update | ISO Admin</title>
     <style>
-        body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#061017;color:#edf7f3;font:16px/1.5 Inter,system-ui,sans-serif;padding:16px;box-sizing:border-box}
-        main{width:100%;max-width:30rem;background:#0d1b24;border:1px solid rgba(139,220,101,.25);border-radius:18px;padding:24px}
-        h1{margin:0 0 12px;font-size:20px;color:#8bdc65}
-        p{margin:0 0 10px}.muted{color:#a9bbb6;font-size:14px}
+        body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f4f6f5;color:#14201b;font:16px/1.5 Inter,system-ui,sans-serif;padding:16px;box-sizing:border-box}
+        main{width:100%;max-width:30rem;background:#fff;border:1px solid #e2e8e5;border-radius:14px;padding:24px;box-shadow:0 1px 2px rgba(20,32,27,.06)}
+        h1{margin:0 0 12px;font-size:20px;color:#0e7f63}
+        p{margin:0 0 10px}.muted{color:#5b6b65;font-size:14px}
     </style>
 </head>
 <body>

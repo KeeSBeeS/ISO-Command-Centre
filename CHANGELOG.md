@@ -1,5 +1,18 @@
 # Changelog
 
+## v3.1.0
+
+New look, part 1: the whole site switches to the new light design. See `README_V3_1_0_NEW_LOOK.md`.
+
+- New design system in `public/css/iso.css`, with light colours, cards, buttons, status pills, tables and forms. Every page uses it.
+- New layout: a dark sidebar grouped into Workspace, Operations and Admin, with line icons (`<x-icon>`), a clean top bar, and a slide-in menu on tablets and phones.
+- Rebuilt dashboard. "Import attendance" is the main button, "Needs attention" gathers what's waiting, and the personal widgets look new. Medium and large attendance widgets show today's clock-ins.
+- The dashboard and shortcut editors can now be reordered with Move up / Move down buttons, which work on touch screens.
+- Restyled login, change password, access denied, installer and "Finishing the update" pages.
+- Pages with their own dark colours (calendar, vehicles, customers, settings and others) now read correctly in the light theme.
+- Fixed System settings ordering using MySQL-only SQL, which also failed in tests.
+- Added a test that opens every page as an administrator, on both SQLite and MySQL.
+
 ## v3.0.1
 
 - Fixed the update failing with a bare "503 Service Unavailable" on sites with large tables. The database backup taken before an update loaded each table into memory at once, which shared hosting kills. It now streams rows: a 200,000-row table peaked at 109 MB before and 18 MB now.

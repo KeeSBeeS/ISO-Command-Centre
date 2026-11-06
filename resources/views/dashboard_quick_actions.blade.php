@@ -3,15 +3,15 @@
 @section('page_title','Edit Quick Actions')
 @section('content')
 <style>
-    .quick-editor{display:grid;gap:12px}.quick-editor-item{border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.04));border-radius:18px;padding:14px;display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;box-shadow:var(--shadow-soft)}.drag-handle{width:44px;height:44px;border-radius:15px;border:1px solid rgba(139,220,101,.22);display:grid;place-items:center;cursor:grab;background:linear-gradient(135deg,rgba(18,163,116,.24),rgba(139,220,101,.08));font-weight:900}.quick-editor-item.dragging{opacity:.55}.quick-editor-controls{display:grid;grid-template-columns:1fr 120px;gap:10px;align-items:center}.quick-title-line{display:flex;gap:10px;align-items:flex-start}.quick-title-icon{width:38px;height:38px;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.07);border:1px solid var(--line)}.quick-title h3{margin:0 0 4px}.quick-title p{margin:0}@media(max-width:760px){.quick-editor-item{grid-template-columns:1fr}.drag-handle{width:100%}.quick-editor-controls{grid-template-columns:1fr}}
+    .sort-editor{display:grid;gap:10px}.sort-item{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:var(--radius);background:#fff}.sort-item.dragging{opacity:.55}.sort-handle{display:flex;flex-direction:column;gap:4px}.sort-handle button{width:40px;height:36px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text-2);cursor:pointer;display:grid;place-items:center}.sort-handle button:hover{background:var(--panel2)}.sort-handle .grip{cursor:grab;color:var(--muted);text-align:center;font-size:12px}.sort-title{display:flex;gap:12px;align-items:flex-start;min-width:0}.sort-title h3{margin:0 0 2px;font-size:15px}.sort-title p{margin:0}.quick-editor-controls{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:12px;align-items:center}@media(max-width:760px){.quick-editor-controls{grid-template-columns:1fr}}
 </style>
 
 <div class="card">
     <div class="page-head" style="margin-bottom:0">
         <div class="page-head-main">
-            <div class="page-head-icon">⚡</div>
+            <div class="page-head-icon"><x-icon name="arrow-right" /></div>
             <div>
-                <h2>Quick Action Shortcuts</h2>
+                <h2>Quick action shortcuts</h2>
                 <p>Select which shortcut buttons should show on your homepage Quick Actions widget. Available shortcuts are still limited by your permissions.</p>
             </div>
         </div>
@@ -22,16 +22,15 @@
 <form method="post" action="{{ route('dashboard.quick_actions.update') }}" id="quick-actions-form">
     @csrf
     @method('PUT')
-    <div class="quick-editor" id="quick-actions-list">
+    <div class="sort-editor" id="quick-actions-list">
         @forelse($quickActions as $action)
-            <div class="quick-editor-item" draggable="true" data-action-key="{{ $action['key'] }}">
-                <div class="drag-handle" title="Drag to reorder">↕</div>
+            <div class="sort-item" draggable="true" data-action-key="{{ $action['key'] }}">
+                <div class="sort-handle"><button type="button" class="move-up" aria-label="Move {{ $action['label'] }} up"><x-icon name="updates" size="16" /></button><button type="button" class="move-down" aria-label="Move {{ $action['label'] }} down" style="transform:rotate(180deg)"><x-icon name="updates" size="16" /></button></div>
                 <div>
                     <input type="hidden" class="sort-input" name="actions[{{ $action['key'] }}][sort_order]" value="{{ $action['sort_order'] }}">
                     <div class="quick-editor-controls">
-                        <div class="quick-title">
-                            <div class="quick-title-line">
-                                <div class="quick-title-icon">{{ $action['icon'] }}</div>
+                        <div>
+                            <div class="sort-title">
                                 <div>
                                     <h3>{{ $action['label'] }}</h3>
                                     <p class="muted small">{{ $action['description'] }}</p>
@@ -47,7 +46,7 @@
         @endforelse
     </div>
     <div style="height:14px"></div>
-    <div class="actions"><button class="btn primary" type="submit">💾 Save Shortcuts</button><a class="btn" href="{{ route('dashboard') }}">Cancel</a></div>
+    <div class="actions"><button class="btn primary" type="submit">Save shortcuts</button><a class="btn" href="{{ route('dashboard') }}">Cancel</a></div>
 </form>
 
 <script>
@@ -57,14 +56,14 @@
     var dragging = null;
 
     function updateSortInputs(){
-        Array.prototype.forEach.call(list.querySelectorAll('.quick-editor-item'), function(item, index){
+        Array.prototype.forEach.call(list.querySelectorAll('.sort-item'), function(item, index){
             var input = item.querySelector('.sort-input');
             if (input) input.value = (index + 1) * 10;
         });
     }
 
     function getAfterElement(y){
-        var items = [].slice.call(list.querySelectorAll('.quick-editor-item:not(.dragging)'));
+        var items = [].slice.call(list.querySelectorAll('.sort-item:not(.dragging)'));
         return items.reduce(function(closest, child){
             var box = child.getBoundingClientRect();
             var offset = y - box.top - box.height / 2;
@@ -73,8 +72,19 @@
         }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 
+    // Buttons for touch screens and keyboards, where dragging doesn't work.
+    list.addEventListener('click', function(e){
+        var button = e.target.closest('.move-up, .move-down');
+        if (!button) return;
+        var item = button.closest('.sort-item');
+        if (button.classList.contains('move-up') && item.previousElementSibling) list.insertBefore(item, item.previousElementSibling);
+        if (button.classList.contains('move-down') && item.nextElementSibling) list.insertBefore(item.nextElementSibling, item);
+        updateSortInputs();
+        button.focus();
+    });
+
     list.addEventListener('dragstart', function(e){
-        dragging = e.target.closest('.quick-editor-item');
+        dragging = e.target.closest('.sort-item');
         if (dragging) dragging.classList.add('dragging');
     });
 
