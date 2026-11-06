@@ -7,7 +7,7 @@ From v3.0.0, ISO Command Centre updates itself from **System Settings → Update
 Sites on v2.8.x or older keep Laravel directly in `public_html` and are opened through `/public`. v3.0.0 moves the code and settings into a private folder outside the web folder. This one upgrade uses a setup file. Your data, accounts and uploaded documents are kept.
 
 1. **Back up first.** In DirectAdmin, back up the site files and the database.
-2. From the **v3.0.0 release on GitHub**, download `iso-setup.php`, `iso-command-centre-v3.0.0.zip` and `iso-command-centre-v3.0.0.zip.sha256`.
+2. From the **latest v3.x release on GitHub**, download `iso-setup.php`, `iso-command-centre-vX.Y.Z.zip` and `iso-command-centre-vX.Y.Z.zip.sha256`.
 3. In DirectAdmin's **File Manager**, upload all three into `domains/isoadmin.co.za/public_html`, next to the existing files. **Don't extract the zip.**
 4. Open `https://isoadmin.co.za/iso-setup.php`. It says which version is installed. Leave the suggested private folder (for example `/home/<user>/iso-command-centre`) unless you have a reason to change it, and click **Move and upgrade**.
 5. Click **Log in and finish the update** and log in as a **System Administrator**. The database is backed up, the database changes are applied and the site checks itself. If anything is wrong, it switches back to the old version by itself.

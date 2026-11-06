@@ -33,6 +33,9 @@ class DatabaseBackup
         $path = $this->directory.'/'.gmdate('Ymd-His').'-'.$label.'.sql.gz';
 
         $pdo = $this->pdo();
+        // Stream rows instead of loading a whole table into memory: shared
+        // hosts kill PHP (a bare 503) long before a big attendance table fits.
+        $buffered = $pdo->getAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY);
         $out = gzopen($path.'.partial', 'wb6');
         if ($out === false) {
             throw new RuntimeException("Could not write the backup file $path.");
@@ -47,6 +50,7 @@ class DatabaseBackup
                 $write("DROP TABLE IF EXISTS $quoted");
                 $write($create);
 
+                $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
                 $rows = $pdo->query("SELECT * FROM $quoted", PDO::FETCH_ASSOC);
                 $batch = [];
                 $columns = null;
@@ -61,9 +65,13 @@ class DatabaseBackup
                 if ($batch) {
                     $write("INSERT INTO $quoted $columns VALUES ".implode(', ', $batch));
                 }
+                $rows->closeCursor();
+                $rows = null;
+                $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $buffered);
             }
         } finally {
             gzclose($out);
+            $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $buffered);
         }
 
         // Only a complete backup gets its real name.

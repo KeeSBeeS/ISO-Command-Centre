@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.0.1
+
+- Fixed the update failing with a bare "503 Service Unavailable" on sites with large tables. The database backup taken before an update loaded each table into memory at once, which shared hosting kills. It now streams rows: a 200,000-row table peaked at 109 MB before and 18 MB now.
+
 ## v3.0.0
 
 Update Manager, ported from Jarvis. See `README_V3_0_0_UPDATE_MANAGER.md` and `docs/updates.md`.
