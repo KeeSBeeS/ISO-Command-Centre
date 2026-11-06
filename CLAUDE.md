@@ -80,6 +80,15 @@ public_html/                 the web folder
 - Events are logged to the Laravel log as `platform_update.*` (`UpdateLog`). There is no activity-log table.
 - Tests: `tests/Support/FakeServer` builds a throwaway `ISO_HOME` plus web folder with stand-in releases, and runs the front door, `cron.php`, `recovery.php` and `iso-setup.php` in a separate PHP process. `tests/Support/InstallsIsoSchema` builds the schema through `InstallController`, as `/install` does. `DatabaseBackupTest` needs MySQL (`ISO_TEST_MYSQL_*`), and the release workflow provides it.
 
+## Responsive design (required)
+
+- **Design for PC first.** Most people use the site on a desktop or laptop, so lay pages out for a wide screen first.
+- **Every page must still be fully usable on tablet and phone.** That covers every page, form, table and action, and it applies to every change, not only new pages.
+- **Use the layout's existing styles** in `resources/views/layouts/app.blade.php`: `.grid.cols-2` and `.grid.cols-4`, `.card`, `.actions`, `.btn` and `.table-wrap`. The layout already adapts at `1080px` (fewer columns), `960px` (the sidebar becomes a menu button) and `560px` (full-width buttons, smaller padding). Pages with their own inline styles need media queries at these same sizes.
+- **No sideways scrolling of the page.** A wide table goes in `.table-wrap`, which scrolls by itself. Long values such as URLs, keys and file names must wrap.
+- **Touch-friendly controls:** buttons and links must be large enough to tap, and nothing may depend on hover alone.
+- **Check every changed page** at phone width (about 390px), tablet width (about 820px) and PC width (1280px or more) before finishing.
+
 ## Commands (local dev only)
 
 `vendor/` is not committed, so run `composer install` first.
