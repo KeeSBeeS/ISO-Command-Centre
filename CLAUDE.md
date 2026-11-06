@@ -6,6 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ISO Admin Command Centre (`isoadmin.co.za`): a Laravel 11 / PHP 8.2+ admin platform for HR and operations. It covers employees, departments, roles and permissions, time attendance, leave and calendar, employee documents and compliance, vehicles, fuel, servicing and Cartrack tracking, and customers/sites. The current version is in `VERSION`. `app/Support/PlatformVersion.php` is stale, so don't trust it.
 
+## Update workflow (required)
+
+- **Every update bumps the version.** Each change shipped to the platform must increase the version in `VERSION`, using semantic versioning (`major.minor.patch`). Add a matching entry to `CHANGELOG.md` and a `README_V<version>_<TOPIC>.md` release note listing the changed files and how to apply them. If the update changes the database, also add its `/updates/vX-Y-Z` updater (see below).
+- **Plan before implementing.** Before making any changes for an update, write a plan and get the user's agreement before proceeding. The plan should cover:
+  - the goal and the version number the update will become;
+  - the files to change or add;
+  - any database, permission or settings changes, and how they stay idempotent;
+  - how the change will be checked.
+
 ## Deployment model (shapes everything)
 
 The production target is **shared hosting with no console access**. There is no SSH, Artisan, Composer or NPM on the server. The rules below follow from that:
