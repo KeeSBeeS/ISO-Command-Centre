@@ -8,6 +8,7 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\InstallController;
+use App\Http\Controllers\PlatformUpdateController;
 use App\Http\Controllers\CronJobController;
 use App\Http\Controllers\CoreSettingController;
 use App\Http\Controllers\CustomerController;
@@ -56,6 +57,21 @@ Route::middleware([EnsureInstalled::class])->group(function () {
         Route::put('/dashboard/quick-actions', [DashboardController::class, 'updateQuickActions'])
             ->middleware(CheckPermission::class . ':dashboard.quick_actions.manage')
             ->name('dashboard.quick_actions.update');
+
+        // Update Manager: install GitHub releases and switch between installed versions.
+        Route::middleware(CheckPermission::class . ':platform_updates.manage')
+            ->prefix('settings/updates')
+            ->controller(PlatformUpdateController::class)
+            ->group(function () {
+                Route::get('/', 'index')->name('platform_updates.index');
+                Route::post('/check', 'check')->name('platform_updates.check');
+                Route::post('/token', 'saveToken')->name('platform_updates.token');
+                Route::post('/install', 'install')->name('platform_updates.install');
+                Route::post('/rollback', 'rollback')->name('platform_updates.rollback');
+                Route::post('/recovery-key', 'newRecoveryKey')->name('platform_updates.recovery_key');
+                Route::post('/dismiss', 'dismiss')->name('platform_updates.dismiss');
+                Route::get('/finish/{token}', 'finish')->name('platform_updates.finish');
+            });
 
         Route::get('/updates/v1-1', [UpdateController::class, 'v11'])
             ->middleware(CheckPermission::class . ':settings.manage')

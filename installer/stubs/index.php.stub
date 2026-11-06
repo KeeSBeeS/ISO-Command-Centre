@@ -1,0 +1,64 @@
+<?php
+
+/*
+ * ISO Command Centre front door, written by the installer and refreshed by each update.
+ *
+ * The ISO Command Centre code and settings live outside this web folder, in ISO_HOME.
+ * This file loads whichever release current.php names.
+ */
+
+use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
+
+define('LARAVEL_START', microtime(true));
+define('ISO_HOME', {{ISO_HOME}});
+define('ISO_WEB', __DIR__);
+
+require ISO_HOME.'/tools.php';
+
+$release = iso_read_php(ISO_HOME.'/current.php');
+if (! iso_valid_version($release)) {
+    http_response_code(500);
+    exit('ISO Command Centre: current.php does not name a valid release.');
+}
+$base = ISO_HOME.'/releases/'.$release;
+
+if (file_exists($maintenance = ISO_HOME.'/shared/storage/framework/maintenance.php')) {
+    require $maintenance;
+}
+
+// Safety net: while an update is being finished, if the new release cannot
+// even start, switch straight back to the previous one.
+$pending = iso_read_php(ISO_HOME.'/update-pending.php');
+if (is_array($pending) && $pending['to'] === $release && empty($pending['migrated'])) {
+    $revert = function (string $reason): void {
+        iso_revert_pending(ISO_HOME, $reason, false);
+        if (! headers_sent()) {
+            header('Location: /settings/updates', true, 302);
+        } else {
+            echo '<p>The update could not start and ISO Command Centre switched back. <a href="/settings/updates">Continue</a></p>';
+        }
+    };
+    register_shutdown_function(function () use ($revert): void {
+        $error = error_get_last();
+        if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)
+            && is_file(ISO_HOME.'/update-pending.php')) {
+            $revert('The new version crashed while starting: '.$error['message']);
+        }
+    });
+
+    try {
+        require $base.'/vendor/autoload.php';
+        /** @var Application $app */
+        $app = require_once $base.'/bootstrap/app.php';
+    } catch (Throwable $e) {
+        $revert('The new version could not start: '.$e->getMessage());
+        exit;
+    }
+} else {
+    require $base.'/vendor/autoload.php';
+    /** @var Application $app */
+    $app = require_once $base.'/bootstrap/app.php';
+}
+
+$app->handleRequest(Request::capture());

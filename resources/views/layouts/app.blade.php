@@ -71,6 +71,7 @@
         $currentUser = auth()->user();
         $topRole = optional($currentUser->roles()->orderByDesc('level')->first())->name ?? 'User';
         $initials = collect(explode(' ', trim($currentUser->name)))->filter()->map(fn($part) => strtoupper(mb_substr($part, 0, 1)))->take(2)->implode('') ?: 'U';
+        $availableUpdate = $currentUser->hasPermission('platform_updates.manage') ? app(\App\Updates\UpdateCheck::class)->available() : null;
         $routeName = request()->route()?->getName() ?? '';
         $pageIcon = match (true) {
             str_starts_with($routeName, 'profile') || str_starts_with($routeName, 'password') => '👤',
@@ -89,7 +90,7 @@
             str_starts_with($routeName, 'google_api_settings') => '🗺️',
             str_starts_with($routeName, 'core_settings') => '🔧',
             str_starts_with($routeName, 'leave_types') => '🗓️',
-            str_starts_with($routeName, 'updates') => '⬆️',
+            str_starts_with($routeName, 'updates'), str_starts_with($routeName, 'platform_updates') => '⬆️',
             default => '⌂',
         };
     @endphp
@@ -161,6 +162,9 @@
                         <a href="{{ route('leave_types.index') }}" class="{{ request()->routeIs('leave_types.*') ? 'active' : '' }}"><span class="nav-icon">🗓️</span><span class="nav-text"><strong>Leave Settings</strong><span>Leave types</span></span></a>
                     @endif
                 @endif
+                @if($currentUser->hasPermission('platform_updates.manage'))
+                    <a href="{{ route('platform_updates.index') }}" class="{{ request()->routeIs('platform_updates.*') ? 'active' : '' }}"><span class="nav-icon">⬆️</span><span class="nav-text"><strong>Updates</strong><span>{{ $availableUpdate ? $availableUpdate->version.' is available' : 'Install and roll back' }}</span></span></a>
+                @endif
                 <form class="logout-form" method="post" action="{{ route('logout') }}">@csrf<button type="submit"><span class="nav-icon">↩</span><span class="nav-text"><strong>Logout</strong><span>End session</span></span></button></form>
             </nav>
         </aside>
@@ -186,6 +190,7 @@
 
         <section class="content">
             @if(session('success'))<div class="alert success">{{ session('success') }}</div>@endif
+            @if(($availableUpdate ?? null) && ! request()->routeIs('platform_updates.*'))<div class="alert success">ISO Command Centre {{ $availableUpdate->version }} is available. <a href="{{ route('platform_updates.index') }}"><strong>Open Updates</strong></a></div>@endif
             @if(session('warning'))<div class="alert warning">{{ session('warning') }}</div>@endif
             @if($errors->any())
                 <div class="alert error">
@@ -193,7 +198,7 @@
                 </div>
             @endif
             @yield('content')
-            <div class="footer-note">ISO Admin Command Framework {{ \Illuminate\Support\Facades\Schema::hasTable('system_settings') ? 'v'.(\App\Models\SystemSetting::valueFor('platform_version', '2.6.10')) : 'v2.6.10' }} · isoadmin.co.za</div>
+            <div class="footer-note">ISO Admin Command Framework {{ config('iso.version') }} · isoadmin.co.za</div>
         </section>
     </main>
 </div>
