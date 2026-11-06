@@ -1,11 +1,11 @@
 @extends('layouts.app')
 @section('title','Install | ISO Admin')
 @section('content')
-<div style="min-height:calc(100vh - 90px);display:grid;place-items:center">
-    <div class="card" style="width:min(620px,100%)">
-        <div class="brand" style="padding:0 0 22px">
-            <div class="brand-mark">ISO</div>
-            <div><strong>ISO Admin Installer</strong><span>Shared-hosting setup, no console required</span></div>
+<div class="auth-wrap">
+    <div class="card auth-card wide">
+        <div class="auth-brand">
+            <span class="brand-mark">ISO</span>
+            <span><strong>ISO Command Centre installer</strong><span>Creates the database tables and your System Administrator account</span></span>
         </div>
 
         @if($installed)
@@ -15,14 +15,14 @@
             <p class="muted">This installer creates the employee, department, role and permission tables. {{ $keyHint }}</p>
             <form method="post" action="{{ route('install.run') }}">
                 @csrf
-                <div class="form-row"><label>Installer key</label><input type="password" name="installer_key" required></div>
+                <div class="form-row"><label for="inst-installer_key">Installer key</label><input id="inst-installer_key" type="password" name="installer_key" required></div>
                 <div class="form-grid">
-                    <div class="form-row"><label>First System Administrator name</label><input type="text" name="name" value="{{ old('name') }}" required></div>
-                    <div class="form-row"><label>First System Administrator email</label><input type="email" name="email" value="{{ old('email') }}" required></div>
+                    <div class="form-row"><label for="inst-name">First System Administrator name</label><input id="inst-name" type="text" name="name" value="{{ old('name') }}" required></div>
+                    <div class="form-row"><label for="inst-email">First System Administrator email</label><input id="inst-email" type="email" name="email" value="{{ old('email') }}" required></div>
                 </div>
                 <div class="form-grid">
-                    <div class="form-row"><label>Password</label><input type="password" name="password" required></div>
-                    <div class="form-row"><label>Confirm password</label><input type="password" name="password_confirmation" required></div>
+                    <div class="form-row"><label for="inst-password">Password</label><input id="inst-password" type="password" name="password" required></div>
+                    <div class="form-row"><label for="inst-password_confirmation">Confirm password</label><input id="inst-password_confirmation" type="password" name="password_confirmation" required></div>
                 </div>
                 <button class="btn primary full" type="submit">Install ISO Admin</button>
             </form>

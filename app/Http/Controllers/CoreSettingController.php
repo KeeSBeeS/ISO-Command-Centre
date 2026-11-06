@@ -92,7 +92,7 @@ class CoreSettingController extends Controller
         return SystemSetting::query()
             ->where('is_core', true)
             ->whereNotIn('group', ['Vehicle Tracking API', 'Google API'])
-            ->orderByRaw("FIELD(`group`, 'Attendance', 'Identity', 'Notifications', 'Reminders', 'Documents', 'Security', 'Vehicles')")
+            ->orderByRaw("CASE `group` WHEN 'Attendance' THEN 1 WHEN 'Identity' THEN 2 WHEN 'Notifications' THEN 3 WHEN 'Reminders' THEN 4 WHEN 'Documents' THEN 5 WHEN 'Security' THEN 6 WHEN 'Vehicles' THEN 7 ELSE 0 END")
             ->orderBy('group')
             ->orderBy('sort_order')
             ->orderBy('label');

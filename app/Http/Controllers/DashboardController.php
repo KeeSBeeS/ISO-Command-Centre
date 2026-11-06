@@ -29,7 +29,16 @@ class DashboardController extends Controller
         $availableQuickActions = $this->availableQuickActions($user, $metrics);
         $quickActions = $this->resolvedQuickActions($user, $availableQuickActions);
 
+        // Today's clock-ins, shown in the attendance widget when it is medium or large.
+        $todayAttendanceRows = $metrics['attendanceReady'] && $user->hasPermission('attendance.view')
+            ? AttendanceDay::with('user:id,name')
+                ->whereDate('attendance_date', now()->toDateString())
+                ->orderByDesc('is_late')->orderBy('start_time')
+                ->limit(8)->get()
+            : collect();
+
         return view('dashboard', array_merge($metrics, [
+            'todayAttendanceRows' => $todayAttendanceRows,
             'dashboardWidgets' => $dashboardWidgets,
             'dashboardPreferencesReady' => Schema::hasTable('dashboard_widget_preferences'),
             'quickActions' => $quickActions,
