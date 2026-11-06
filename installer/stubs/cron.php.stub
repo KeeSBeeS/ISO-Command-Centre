@@ -1,0 +1,35 @@
+<?php
+
+/*
+ * ISO Command Centre background tasks, written by the installer. Run every minute by a
+ * DirectAdmin cron job. Runs the scheduler of whichever release is current.
+ */
+
+use Illuminate\Foundation\Application;
+use Symfony\Component\Console\Input\ArgvInput;
+
+define('LARAVEL_START', microtime(true));
+define('ISO_HOME', __DIR__);
+
+require ISO_HOME.'/tools.php';
+
+// An update that was never finished (for example, the browser was closed
+// half way) is undone once its time window has passed.
+$pending = iso_read_php(ISO_HOME.'/update-pending.php');
+if (is_array($pending) && time() > $pending['until']) {
+    iso_revert_pending(ISO_HOME, 'The update was not finished in time, so ISO Command Centre switched back.', ! empty($pending['migrated']));
+}
+
+$release = iso_read_php(ISO_HOME.'/current.php');
+if (! iso_valid_version($release)) {
+    fwrite(STDERR, "ISO Command Centre: current.php does not name a valid release.\n");
+    exit(1);
+}
+$base = ISO_HOME.'/releases/'.$release;
+
+require $base.'/vendor/autoload.php';
+
+/** @var Application $app */
+$app = require_once $base.'/bootstrap/app.php';
+
+exit($app->handleCommand(new ArgvInput(['artisan', 'schedule:run'])));

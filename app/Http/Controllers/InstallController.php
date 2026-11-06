@@ -7,6 +7,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -40,13 +41,18 @@ class InstallController extends Controller
             return back()->withErrors(['installer_key' => 'Invalid installer key.'])->withInput();
         }
 
-        DB::transaction(function () use ($data) {
-            $this->createTables();
-            $this->seedPermissionsAndRoles();
-            $this->createFirstSystemAdministrator($data);
-        });
+        // Not one transaction: MySQL commits on every CREATE/ALTER TABLE, so
+        // DB::transaction() failed with "There is no active transaction".
+        // Every step only creates what is missing, so the install can be re-run.
+        $this->createTables();
+        $this->seedPermissionsAndRoles();
+        $this->createFirstSystemAdministrator($data);
 
         $this->writeInstallLock();
+
+        // From v3.0.0 database changes are migrations, which the Update Manager
+        // runs. Record the ones this fresh install already covers.
+        Artisan::call('migrate', ['--force' => true]);
 
         return redirect()->route('login')->with('success', 'ISO Admin installed. Log in with the System Administrator account you created.');
     }
@@ -602,6 +608,7 @@ class InstallController extends Controller
             ['name' => 'Run Cron Jobs Manually', 'slug' => 'cron_jobs.run', 'module' => 'Cron Jobs', 'description' => 'Manually trigger safe cron jobs from the web interface.'],
             ['name' => 'View Leave Types', 'slug' => 'leave_types.view', 'module' => 'Leave Settings', 'description' => 'View leave types available to employees.'],
             ['name' => 'Manage Leave Types', 'slug' => 'leave_types.manage', 'module' => 'Leave Settings', 'description' => 'Create and edit leave types and whether they deduct allocated leave.'],
+            ['name' => 'Manage Platform Updates', 'slug' => 'platform_updates.manage', 'module' => 'Settings', 'description' => 'Install new versions from GitHub, switch back to older versions and manage the recovery key.'],
             ['name' => 'Manage Settings', 'slug' => 'settings.manage', 'module' => 'Settings', 'description' => 'Manage platform-level settings.'],
         ];
     }

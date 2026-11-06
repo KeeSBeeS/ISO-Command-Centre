@@ -1,0 +1,102 @@
+<?php
+
+/*
+ * ISO Command Centre emergency recovery, written into the web folder by each update.
+ *
+ * For when ISO Command Centre won't open at all: switch to another installed version and,
+ * optionally, restore the latest database backup. Works without ISO Command Centre
+ * (Laravel) running. Protected by the recovery key shown once on the
+ * Updates page; only a hash of it is stored.
+ */
+
+declare(strict_types=1);
+
+define('ISO_HOME', {{ISO_HOME}});
+
+require ISO_HOME.'/tools.php';
+
+const RECOVERY_MAX_ATTEMPTS = 5;
+const RECOVERY_LOCK_SECONDS = 900;
+
+header('Cache-Control: no-store');
+header('X-Frame-Options: DENY');
+header('X-Robots-Tag: noindex');
+
+$e = fn (string $value): string => htmlspecialchars($value, ENT_QUOTES);
+$page = function (string $body): void {
+    echo '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">',
+    '<title>ISO Command Centre recovery</title><style>',
+    'body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#061017;color:#edf7f3;font:16px/1.5 system-ui,sans-serif;padding:16px;box-sizing:border-box}',
+    'main{width:100%;max-width:30rem;background:#0d1b24;border:1px solid rgba(239,68,68,.35);border-radius:8px;padding:24px}',
+    'h1{margin:0 0 16px;color:#fca5a5;letter-spacing:.2em;text-transform:uppercase;font-size:20px;text-align:center}',
+    'label{display:block;font-size:14px;margin:12px 0 4px}input,select{width:100%;box-sizing:border-box;padding:8px;border-radius:4px;border:1px solid #334155;background:#020617;color:#f1f5f9;font:14px monospace}',
+    'input[type=checkbox]{width:auto;margin-right:8px}button,a.button{display:block;width:100%;margin-top:16px;padding:10px;border:0;border-radius:4px;background:#12a374;color:#020617;font-weight:600;text-align:center;text-decoration:none;cursor:pointer;font-size:16px}',
+    '.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fecaca;padding:8px 12px;border-radius:4px}',
+    '.ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:#a7f3d0;padding:8px 12px;border-radius:4px}',
+    'small{color:#94a3b8}</style></head><body><main><h1>ISO Command Centre recovery</h1>', $body, '</main></body></html>';
+};
+
+$key = iso_read_php(ISO_HOME.'/recovery-key.php');
+if (! is_array($key) || empty($key['hash'])) {
+    $page('<p class="error">Recovery isn\'t set up yet. It is set up the first time you open the Updates page in ISO Command Centre.</p>');
+
+    return;
+}
+
+$releases = iso_installed_releases(ISO_HOME);
+$current = iso_read_php(ISO_HOME.'/current.php');
+$backups = glob(ISO_HOME.'/backups/*.sql.gz') ?: [];
+usort($backups, fn ($a, $b) => filemtime($b) <=> filemtime($a));
+$latestBackup = $backups[0] ?? null;
+
+$attempts = iso_read_php(ISO_HOME.'/recovery-attempts.php');
+if (! is_array($attempts) || time() - $attempts['since'] > RECOVERY_LOCK_SECONDS) {
+    $attempts = ['count' => 0, 'since' => time()];
+}
+
+$message = '';
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    if ($attempts['count'] >= RECOVERY_MAX_ATTEMPTS) {
+        $message = '<p class="error">Too many wrong keys. Wait 15 minutes and try again.</p>';
+    } elseif (! password_verify(strtoupper(trim((string) ($_POST['key'] ?? ''))), $key['hash'])) {
+        iso_write_php(ISO_HOME.'/recovery-attempts.php', ['count' => $attempts['count'] + 1, 'since' => $attempts['since']]);
+        $message = '<p class="error">That recovery key is not correct.</p>';
+    } else {
+        iso_remove(ISO_HOME.'/recovery-attempts.php');
+        $version = (string) ($_POST['version'] ?? '');
+        try {
+            if (! in_array($version, $releases, true)) {
+                throw new RuntimeException('Choose one of the installed versions.');
+            }
+            iso_remove(ISO_HOME.'/update-pending.php');
+            iso_switch(ISO_HOME, $version);
+            $restored = '';
+            if (! empty($_POST['restore']) && $latestBackup) {
+                iso_restore_backup(iso_pdo(iso_env(ISO_HOME)), $latestBackup);
+                $restored = ' and restored the database backup '.basename($latestBackup);
+            }
+            iso_bring_up(ISO_HOME);
+            file_put_contents(ISO_HOME.'/recovery.log', date('c')." switched to $version$restored\n", FILE_APPEND);
+            $current = $version;
+            $message = '<p class="ok">Done: ISO Command Centre now runs '.$e($version).$e($restored).'.</p><a class="button" href="/">Open ISO Command Centre</a>';
+        } catch (Throwable $exception) {
+            $message = '<p class="error">'.$e($exception->getMessage()).'</p>';
+        }
+    }
+}
+
+$options = '';
+foreach ($releases as $release) {
+    $options .= '<option value="'.$e($release).'"'.($release === $current ? ' selected' : '').'>'
+        .$e($release).($release === $current ? ' (running now)' : '').'</option>';
+}
+
+$page($message
+    .'<p><small>Use this only if ISO Command Centre won\'t open. Switch to a version that worked, optionally restoring the latest database backup.</small></p>'
+    .'<form method="post" autocomplete="off">'
+    .'<label for="key">Recovery key</label><input id="key" name="key" required>'
+    .'<label for="version">Switch to version</label><select id="version" name="version">'.$options.'</select>'
+    .($latestBackup
+        ? '<label><input type="checkbox" name="restore" value="1">Also restore the latest database backup ('.$e(basename($latestBackup)).', '.$e(date('Y-m-d H:i', filemtime($latestBackup))).' UTC). Changes made since then are lost.</label>'
+        : '')
+    .'<button>Switch</button></form>');

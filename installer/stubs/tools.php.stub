@@ -1,0 +1,216 @@
+<?php
+
+/*
+ * ISO Command Centre server tools: plain PHP, no Laravel.
+ *
+ * Copied to ISO_HOME/tools.php and used by the front door, cron.php and
+ * recovery.php, which must keep working even when a release cannot start.
+ * ISO Command Centre itself loads this same file from installer/stubs/ for switching
+ * releases and restoring database backups, so there is one implementation.
+ */
+
+if (! function_exists('iso_write_php')) {
+    /**
+     * Atomically write a PHP file that returns $value.
+     */
+    function iso_write_php(string $path, mixed $value): void
+    {
+        $temporary = $path.'.tmp-'.bin2hex(random_bytes(4));
+        if (file_put_contents($temporary, '<?php return '.var_export($value, true).";\n", LOCK_EX) === false) {
+            throw new RuntimeException("Could not write $temporary.");
+        }
+        @chmod($temporary, 0600);
+        if (! rename($temporary, $path)) {
+            iso_remove($temporary);
+            throw new RuntimeException("Could not replace $path.");
+        }
+        iso_forget_cached($path);
+    }
+
+    /**
+     * Delete files that may or may not exist.
+     */
+    function iso_remove(string ...$paths): void
+    {
+        foreach ($paths as $path) {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+    }
+
+    /**
+     * Read a PHP file written by iso_write_php, or null if it doesn't exist.
+     *
+     * The file is read from disk every time rather than with require, so
+     * PHP's opcode cache can never serve an old copy. Shared hosts often
+     * block opcache_invalidate() and only re-check files every minute or so,
+     * which would otherwise keep running the old release after a switch.
+     */
+    function iso_read_php(string $path): mixed
+    {
+        clearstatcache(true, $path);
+        if (! is_file($path)) {
+            return null;
+        }
+
+        return eval('?>'.file_get_contents($path));
+    }
+
+    /**
+     * Make sure PHP's opcode cache never serves an old copy of a file we just changed.
+     */
+    function iso_forget_cached(string $path): void
+    {
+        clearstatcache(true, $path);
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($path, true);
+        }
+    }
+
+    function iso_valid_version(mixed $version): bool
+    {
+        return is_string($version) && preg_match('/^v[0-9A-Za-z.\-]+$/', $version) === 1;
+    }
+
+    /**
+     * Make $version the active release.
+     */
+    function iso_switch(string $home, string $version): void
+    {
+        if (! iso_valid_version($version) || ! is_file("$home/releases/$version/bootstrap/app.php")) {
+            throw new RuntimeException("Release $version is not installed.");
+        }
+        iso_write_php("$home/current.php", $version);
+    }
+
+    /**
+     * Take ISO Command Centre out of maintenance mode.
+     */
+    function iso_bring_up(string $home): void
+    {
+        iso_remove("$home/shared/storage/framework/down");
+    }
+
+    /**
+     * Undo an unfinished update: switch back to the release it came from,
+     * restore the database backup if requested, and record why.
+     * $databaseRestored says the caller already restored it.
+     */
+    function iso_revert_pending(string $home, string $reason, bool $restoreDatabase, bool $databaseRestored = false): void
+    {
+        $pending = iso_read_php("$home/update-pending.php");
+        if (! is_array($pending)) {
+            return;
+        }
+
+        iso_switch($home, $pending['from']);
+
+        $restored = $databaseRestored;
+        if ($restoreDatabase && ! $restored && ! empty($pending['backup']) && is_file($pending['backup'])) {
+            iso_restore_backup(iso_pdo(iso_env($home)), $pending['backup']);
+            $restored = true;
+        }
+
+        iso_write_php("$home/update-failed.php", [
+            'version' => $pending['to'],
+            'reason' => $reason,
+            'database_restored' => $restored,
+            'at' => time(),
+        ]);
+        iso_remove("$home/update-pending.php");
+        iso_bring_up($home);
+    }
+
+    /**
+     * Read shared/.env (the format App\Support\EnvFile writes).
+     *
+     * @return array<string, string>
+     */
+    function iso_env(string $home): array
+    {
+        $values = [];
+        foreach (file("$home/shared/.env", FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+            if (! preg_match('/^([A-Z][A-Z0-9_]*)=(.*)$/', $line, $match)) {
+                continue;
+            }
+            $value = $match[2];
+            if (strlen($value) >= 2 && $value[0] === "'" && str_ends_with($value, "'")) {
+                $value = substr($value, 1, -1);
+            } elseif (strlen($value) >= 2 && $value[0] === '"' && str_ends_with($value, '"')) {
+                $value = preg_replace('/\\\\(["\\\\$])/', '$1', substr($value, 1, -1));
+            }
+            $values[$match[1]] = $value;
+        }
+
+        return $values;
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     */
+    function iso_pdo(array $env): PDO
+    {
+        $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
+            $env['DB_HOST'] ?? 'localhost', $env['DB_PORT'] ?? '3306', $env['DB_DATABASE'] ?? '');
+
+        return new PDO($dsn, $env['DB_USERNAME'] ?? '', $env['DB_PASSWORD'] ?? '', [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        ]);
+    }
+
+    /**
+     * Replace every table in the database with the contents of a backup made
+     * by App\Updates\DatabaseBackup. Statements are separated by a line
+     * containing only "-- iso:end".
+     */
+    function iso_restore_backup(PDO $pdo, string $file): void
+    {
+        $handle = gzopen($file, 'rb');
+        if ($handle === false) {
+            throw new RuntimeException("Could not open backup $file.");
+        }
+
+        $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
+        try {
+            // Tables created after the backup (by newer migrations) must go too.
+            foreach ($pdo->query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'")->fetchAll(PDO::FETCH_NUM) as $row) {
+                $pdo->exec('DROP TABLE `'.str_replace('`', '``', $row[0]).'`');
+            }
+
+            $statement = '';
+            while (($line = gzgets($handle)) !== false) {
+                if (rtrim($line, "\r\n") === '-- iso:end') {
+                    if (trim($statement) !== '') {
+                        $pdo->exec($statement);
+                    }
+                    $statement = '';
+                } else {
+                    $statement .= $line;
+                }
+            }
+        } finally {
+            gzclose($handle);
+            $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+        }
+    }
+
+    /**
+     * Installed releases, newest first.
+     *
+     * @return list<string>
+     */
+    function iso_installed_releases(string $home): array
+    {
+        $versions = [];
+        foreach (glob("$home/releases/v*", GLOB_ONLYDIR) ?: [] as $dir) {
+            $version = basename($dir);
+            if (iso_valid_version($version) && is_file("$dir/bootstrap/app.php")) {
+                $versions[] = $version;
+            }
+        }
+        usort($versions, fn ($a, $b) => version_compare(ltrim($b, 'v'), ltrim($a, 'v')));
+
+        return $versions;
+    }
+}

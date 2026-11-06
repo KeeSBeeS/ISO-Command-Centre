@@ -1,5 +1,18 @@
 # Changelog
 
+## v3.0.0
+
+Update Manager, ported from Jarvis. See `README_V3_0_0_UPDATE_MANAGER.md` and `docs/updates.md`.
+
+- Added System Settings → Updates (`/settings/updates`), with the new `platform_updates.manage` permission. It installs GitHub releases with a database backup first, runs database migrations and a health check, and switches back by itself on failure.
+- Added rollback to any of the last 3 installed versions, code only or with the database as that version left it, and an update history kept outside the database.
+- Added safety nets outside Laravel: the front door switches back if a new version can't start, `cron.php` undoes an update that was never finished, and `recovery.php` works with a recovery key.
+- New server layout: releases, shared settings and storage live in a private folder outside `public_html`, and the site is served without `/public` (old links redirect). `iso-setup.php` moves a v2.8.x site across once.
+- Database changes are now Laravel migrations. The stock migrations only create missing tables, and the old `/updates/vX-Y-Z` pages remain.
+- Added the release workflow and `scripts/build-release.sh`. Release zips include `vendor/`.
+- Fixed `/install` failing on MySQL with "There is no active transaction".
+- Fixed `composer.json` scripts and removed the machine-specific `cache-dir`.
+
 ## v2.8.0 Foreign Key Hotfix
 
 - Fixed MySQL error `1059 Identifier name is too long` during the v2.8.0 update.

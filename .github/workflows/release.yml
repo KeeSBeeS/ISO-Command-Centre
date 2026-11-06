@@ -1,0 +1,87 @@
+name: Release
+
+# Builds the release zip and publishes it as a GitHub release, which the
+# Update Manager (System Settings → Updates) installs from. Start it either
+# by pushing a version tag (e.g. v3.0.0) on main, or with "Run workflow" on
+# main and a version number, in which case the release creates the tag itself.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. v3.0.0'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # A real MySQL for the database backup and restore tests.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: iso_test
+          MYSQL_USER: iso_test
+          MYSQL_PASSWORD: secret
+        ports: ['3306:3306']
+        options: --health-cmd="mysqladmin ping -h 127.0.0.1" --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      ISO_TEST_MYSQL_HOST: 127.0.0.1
+      ISO_TEST_MYSQL_DATABASE: iso_test
+      ISO_TEST_MYSQL_USERNAME: iso_test
+      ISO_TEST_MYSQL_PASSWORD: secret
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check version
+        run: |
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must look like v1.2.3, got '$VERSION'."; exit 1
+          fi
+          if [[ "v$(tr -d '[:space:]' < VERSION)" != "$VERSION" ]]; then
+            echo "::error::The VERSION file says $(cat VERSION), but this release is $VERSION. Bump VERSION first."; exit 1
+          fi
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+              echo "::error::Releases are only made from main."; exit 1
+            fi
+            if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null; then
+              echo "::error::$VERSION already exists. Choose a new version number."; exit 1
+            fi
+          fi
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite, pdo_mysql, zip
+          coverage: none
+
+      # Never release untested code: run the full test suite first.
+      - name: Test
+        run: |
+          composer install --prefer-dist --no-interaction --no-progress
+          cp .env.example .env
+          php artisan key:generate
+          php artisan test
+
+      - name: Build release package
+        run: scripts/build-release.sh "$VERSION"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          files: |
+            dist/iso-command-centre-${{ env.VERSION }}.zip
+            dist/iso-command-centre-${{ env.VERSION }}.zip.sha256
+            installer/iso-setup.php
